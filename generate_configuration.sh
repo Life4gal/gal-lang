@@ -45,8 +45,11 @@ fi
 # check c/cxx compiler
 CONFIG_CXX_COMPILER_LOC="$(type -p circle)"
 CONFIG_C_COMPILER_LOC="$(type -p gcc)"
+CONFIG_CXX_COMPILER_HAS_META="true"
 
 if [[ -z $CONFIG_CXX_COMPILER_LOC ]]; then
+	# currently only circle supports META.:(
+	CONFIG_CXX_COMPILER_HAS_META="false"
 	CONFIG_CXX_COMPILER_LOC="$(type -p "$g++")"
 elif [[ -z $CONFIG_CXX_COMPILER_LOC ]]; then
 	CONFIG_CXX_COMPILER_LOC="$(type -p "$clang++")"
@@ -80,7 +83,7 @@ CONFIG_JSON_STRING="{
 				\"buildRoot\": \"$CONFIG_BUILD_ROOT\",
 				\"installRoot\": \"$CONFIG_INSTALL_ROOT\",
 				\"cmakeExecutable\": \"$CONFIG_CMAKE_EXECUTABLE\",
-				\"cmakeCommandArgs\": \"-G \\\"$CONFIG_GENERATOR_NAME\\\" -DCMAKE_C_COMPILER=$CONFIG_C_COMPILER_LOC -DCMAKE_CXX_COMPILER=$CONFIG_CXX_COMPILER_LOC\",
+				\"cmakeCommandArgs\": \"-G \\\"$CONFIG_GENERATOR_NAME\\\" -DCMAKE_C_COMPILER=$CONFIG_C_COMPILER_LOC -DCMAKE_CXX_COMPILER=$CONFIG_CXX_COMPILER_LOC -DCONFIG_CXX_COMPILER_HAS_META=$CONFIG_CXX_COMPILER_HAS_META \",
 				\"buildCommandArgs\": \"$CONFIG_BUILD_COMMAND_ARGS\",
 				\"ctestCommandArgs\": \"$CONFIG_CTEST_COMMAND_ARGS\",
 				\"inheritEnvironments\": [\"$CONFIG_INHERIT_ENVIRONMENTS\"],

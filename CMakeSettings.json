@@ -8,7 +8,7 @@
 				"buildRoot": "${projectDir}\\WSL_Debug\\build",
 				"installRoot": "${projectDir}\\WSL_Debug\\install",
 				"cmakeExecutable": "cmake",
-				"cmakeCommandArgs": "-G \"Ninja\" -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/circle",
+				"cmakeCommandArgs": "-G \"Ninja\" -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/circle -DCONFIG_CXX_COMPILER_HAS_META=true ",
 				"buildCommandArgs": "",
 				"ctestCommandArgs": "",
 				"inheritEnvironments": ["linux_x64"],
