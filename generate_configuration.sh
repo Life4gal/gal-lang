@@ -28,7 +28,7 @@ CONFIG_CMAKE_EXECUTABLE="cmake"
 CONFIG_BUILD_COMMAND_ARGS=""
 CONFIG_CTEST_COMMAND_ARGS=""
 CONFIG_INHERIT_ENVIRONMENTS="linux_x64"
-CONFIG_WSL_PATH="\${defaulWSLPath}"
+CONFIG_WSL_PATH="\${defaultWSLPath}"
 
 # check cmake
 if [[ -z "$(type -p cmake)" ]]; then
