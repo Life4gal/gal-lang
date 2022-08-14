@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CONFIG_BUILD_TYPE_LIST=("Debug" "Release" "RelWithDebugInfo" "MinSizeRelease")
+CONFIG_BUILD_TYPE_LIST=("Debug" "Release" "RelWithDebugInfo" "MinSizeRel")
 CONFIG_BUILD_TYPE_LIST_STRING=$(IFS=$'/'; echo "${CONFIG_BUILD_TYPE_LIST[*]}")
 
 CONFIG_BUILD_TYPE="Debug"
