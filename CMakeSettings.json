@@ -1,0 +1,18 @@
+{
+	"configurations": 
+		[
+			{
+				"name": "WSL_Debug",
+				"generator": "Ninja",
+				"configurationType": "Debug",
+				"buildRoot": "${projectDir}\\WSL_Debug\\build",
+				"installRoot": "${projectDir}\\WSL_Debug\\install",
+				"cmakeExecutable": "cmake",
+				"cmakeCommandArgs": "-G \"Ninja\" -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/circle",
+				"buildCommandArgs": "",
+				"ctestCommandArgs": "",
+				"inheritEnvironments": ["linux_x64"],
+				"wslPath": "${defaultWSLPath}"
+			}
+		]
+}
