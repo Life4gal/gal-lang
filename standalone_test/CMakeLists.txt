@@ -19,6 +19,12 @@ add_executable(
 		${${PROJECT_NAME}_SOURCE}
 )
 
+target_include_directories(
+		${PROJECT_NAME}
+		PUBLIC
+		${PROJECT_SOURCE_DIR}/include
+)
+
 set_compile_options_private(${PROJECT_NAME})
 
 target_link_libraries(
