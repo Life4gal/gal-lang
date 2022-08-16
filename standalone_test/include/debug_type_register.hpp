@@ -1,4 +1,5 @@
 #include <cassert>
+#include <cstdint>
 #include <map>
 #include <string>
 #include <string_view>
@@ -14,7 +15,7 @@ struct debug_type_register
 {
 	inline static std::map<std::uint32_t, GSL_STRING_TYPE> debug_type_names{};
 
-	static void register_debug_type(std::uint32_t id, const char* name)
+	static void register_debug_type(const std::uint32_t id, const GSL_STRING_VIEW_TYPE name)
 	{
 		if (const auto it = debug_type_names.find(id);
 			it != debug_type_names.end()) { assert(name == it->second); }

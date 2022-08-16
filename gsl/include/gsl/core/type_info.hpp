@@ -7,7 +7,7 @@
 
 namespace gal::gsl::core
 {
-	alignas(alignof(std::uint64_t)) struct type_info
+	struct alignas(alignof(std::uint64_t)) type_info
 	{
 		using type_id_type = std::uint32_t;
 		using attribute_type = std::uint32_t;
