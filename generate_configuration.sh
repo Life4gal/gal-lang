@@ -50,13 +50,13 @@ CONFIG_CXX_COMPILER_HAS_META="true"
 if [[ -z $CONFIG_CXX_COMPILER_LOC ]]; then
 	# currently only circle supports META.:(
 	CONFIG_CXX_COMPILER_HAS_META="false"
-	CONFIG_CXX_COMPILER_LOC="$(type -p "$g++")"
+	CONFIG_CXX_COMPILER_LOC="$(type -p g++)"
 elif [[ -z $CONFIG_CXX_COMPILER_LOC ]]; then
-	CONFIG_CXX_COMPILER_LOC="$(type -p "$clang++")"
+	CONFIG_CXX_COMPILER_LOC="$(type -p clang++)"
 fi
 
 if [[ -z $CONFIG_C_COMPILER_LOC ]]; then
-	CONFIG_C_COMPILER_LOC="$(type -p "$clang")"
+	CONFIG_C_COMPILER_LOC="$(type -p clang)"
 fi
 
 if [[ -z $CONFIG_CXX_COMPILER_LOC ]]; then

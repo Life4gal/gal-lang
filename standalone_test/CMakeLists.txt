@@ -27,8 +27,11 @@ target_include_directories(
 
 set_compile_options_private(${PROJECT_NAME})
 
+include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/eve.cmake)
+
 target_link_libraries(
 		${PROJECT_NAME}
 		PRIVATE
+		eve::eve
 		gal::GSL
 )
