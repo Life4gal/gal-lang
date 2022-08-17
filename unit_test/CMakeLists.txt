@@ -8,15 +8,15 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 set(
-		${PROJECT_NAME}_SOURCE
-		
-		src/main.cpp
+	${PROJECT_NAME}_MATH_SOURCE
+
+	src/math/test_vec.cpp
 )
 
 add_executable(
 		${PROJECT_NAME}
 		
-		${${PROJECT_NAME}_SOURCE}
+		${${PROJECT_NAME}_MATH_SOURCE}
 )
 
 set_compile_options_private(${PROJECT_NAME})
@@ -28,6 +28,7 @@ target_link_libraries(
 		${PROJECT_NAME}
 		PRIVATE
 		gtest_main
+		gal::GSL
 )
 
 # for gtest_discover_tests

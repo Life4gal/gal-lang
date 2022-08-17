@@ -3,14 +3,23 @@ project(
 		LANGUAGES CXX
 )
 
+set(
+	${PROJECT_NAME}_SOURCE
+
+	src/dummy.cpp
+)
+
 add_library(
 	${PROJECT_NAME}
-	INTERFACE
+	# todo
+	STATIC
+
+	${${PROJECT_NAME}_SOURCE}
 )
 
 target_include_directories(
 	${PROJECT_NAME}
-	INTERFACE 
+	PUBLIC 
 	${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
@@ -37,4 +46,12 @@ target_compile_definitions(
 			# TODO: MORE COMPILERS HERE.
 )
 
-set_compile_options_interface(${PROJECT_NAME})
+set_compile_options_private(${PROJECT_NAME})
+
+include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/eve.cmake)
+
+target_link_libraries(
+		${PROJECT_NAME}
+		PUBLIC
+		eve::eve
+)
