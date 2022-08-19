@@ -49,9 +49,11 @@ target_compile_definitions(
 set_compile_options_private(${PROJECT_NAME})
 
 include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/eve.cmake)
+include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/foonathan-memory.cmake)
 
 target_link_libraries(
 		${PROJECT_NAME}
 		PUBLIC
 		eve::eve
+		foonathan_memory
 )
