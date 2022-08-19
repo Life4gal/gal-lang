@@ -50,10 +50,44 @@ set_compile_options_private(${PROJECT_NAME})
 
 include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/eve.cmake)
 include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/foonathan-memory.cmake)
+include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/spdlog.cmake)
 
 target_link_libraries(
 		${PROJECT_NAME}
 		PUBLIC
 		eve::eve
 		foonathan_memory
+		# spdlog
+		spdlog_header_only
 )
+
+include(CheckCXXSourceCompiles)
+CHECK_CXX_SOURCE_COMPILES(
+	"
+	#include <format>
+	int main()
+	{
+		std::cout << std::format(\"hello {}!\", \"world\");
+	}
+	"
+	COMPILER_SUPPORT_FORMAT
+)
+
+if (${COMPILER_SUPPORT_FORMAT})
+	message("${PROJECT_NAME} info: current compiler ${CMAKE_CXX_COMPILER} support std::format.")
+else ()
+	message("${PROJECT_NAME} info: current compiler ${CMAKE_CXX_COMPILER} not support std::format, use fmtlib instead now.")
+	target_compile_definitions(
+			${PROJECT_NAME}
+			PUBLIC
+			GSL_FMT_NOT_SUPPORT
+			SPDLOG_FMT_EXTERNAL
+	)
+	include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/fmtlib.cmake)
+	message("${PROJECT_NAME} info: build fmtlib as a public module of ${PROJECT_NAME}.")
+	target_link_libraries(
+			${PROJECT_NAME}
+			PUBLIC
+			fmt
+	)
+endif (${COMPILER_SUPPORT_FORMAT})
