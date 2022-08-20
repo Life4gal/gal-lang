@@ -13,10 +13,17 @@ set(
 	src/math/test_vec.cpp
 )
 
+set(
+	${PROJECT_NAME}_BOOST_SOURCE
+
+	src/boost/test_string_writer.cpp
+)
+
 add_executable(
 		${PROJECT_NAME}
 		
 		${${PROJECT_NAME}_MATH_SOURCE}
+		${${PROJECT_NAME}_BOOST_SOURCE}
 )
 
 set_compile_options_private(${PROJECT_NAME})

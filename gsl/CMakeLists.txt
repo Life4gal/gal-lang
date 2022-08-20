@@ -6,7 +6,7 @@ project(
 set(
 	${PROJECT_NAME}_SOURCE
 
-	src/dummy.cpp
+	src/string_writer.cpp
 )
 
 add_library(
