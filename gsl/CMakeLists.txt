@@ -46,6 +46,7 @@ target_compile_definitions(
 			# TODO: MORE COMPILERS HERE.
 )
 
+set(CMAKE_CXX_STANDARD 23)
 set_compile_options_private(${PROJECT_NAME})
 
 include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/eve.cmake)

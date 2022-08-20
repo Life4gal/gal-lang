@@ -2,7 +2,7 @@
 
 #include <eve/product_type.hpp>
 
-namespace gal::gsl::math
+namespace gal::gsl::boost
 {
 	enum class vec_fill_tag
 	{
@@ -71,6 +71,22 @@ namespace gal::gsl::math
 		[[nodiscard]] constexpr decltype(auto) a() noexcept { return get<3>(*this); }
 		[[nodiscard]] constexpr decltype(auto) a() const noexcept { return get<3>(*this); }
 
+		[[nodiscard]] friend constexpr decltype(auto) x(eve::like<vec4f> auto&& self) noexcept { return std::forward<decltype(self)>(self).x(); }
+
+		[[nodiscard]] friend constexpr decltype(auto) y(eve::like<vec4f> auto&& self) noexcept { return std::forward<decltype(self)>(self).y(); }
+
+		[[nodiscard]] friend constexpr decltype(auto) z(eve::like<vec4f> auto&& self) noexcept { return std::forward<decltype(self)>(self).z(); }
+
+		[[nodiscard]] friend constexpr decltype(auto) w(eve::like<vec4f> auto&& self) noexcept { return std::forward<decltype(self)>(self).w(); }
+
+		[[nodiscard]] friend constexpr decltype(auto) r(eve::like<vec4f> auto&& self) noexcept { return std::forward<decltype(self)>(self).r(); }
+
+		[[nodiscard]] friend constexpr decltype(auto) g(eve::like<vec4f> auto&& self) noexcept { return std::forward<decltype(self)>(self).g(); }
+
+		[[nodiscard]] friend constexpr decltype(auto) b(eve::like<vec4f> auto&& self) noexcept { return std::forward<decltype(self)>(self).b(); }
+
+		[[nodiscard]] friend constexpr decltype(auto) a(eve::like<vec4f> auto&& self) noexcept { return std::forward<decltype(self)>(self).a(); }
+
 		[[nodiscard]] explicit constexpr operator struct vec3f() const noexcept;
 	};
 
@@ -133,6 +149,18 @@ namespace gal::gsl::math
 		[[nodiscard]] constexpr decltype(auto) b() noexcept { return get<2>(*this); }
 		[[nodiscard]] constexpr decltype(auto) b() const noexcept { return get<2>(*this); }
 
+		[[nodiscard]] friend constexpr decltype(auto) x(eve::like<vec3f> auto&& self) noexcept { return std::forward<decltype(self)>(self).x(); }
+
+		[[nodiscard]] friend constexpr decltype(auto) y(eve::like<vec3f> auto&& self) noexcept { return std::forward<decltype(self)>(self).y(); }
+
+		[[nodiscard]] friend constexpr decltype(auto) z(eve::like<vec3f> auto&& self) noexcept { return std::forward<decltype(self)>(self).z(); }
+
+		[[nodiscard]] friend constexpr decltype(auto) r(eve::like<vec3f> auto&& self) noexcept { return std::forward<decltype(self)>(self).r(); }
+
+		[[nodiscard]] friend constexpr decltype(auto) g(eve::like<vec3f> auto&& self) noexcept { return std::forward<decltype(self)>(self).g(); }
+
+		[[nodiscard]] friend constexpr decltype(auto) b(eve::like<vec3f> auto&& self) noexcept { return std::forward<decltype(self)>(self).b(); }
+
 		[[nodiscard]] explicit constexpr operator vec4f() const noexcept { return vec4f{x(), y(), z(), 0}; }
 	};
 
@@ -180,6 +208,14 @@ namespace gal::gsl::math
 		[[nodiscard]] constexpr decltype(auto) i3() const noexcept { return get<2>(*this); }
 		[[nodiscard]] constexpr decltype(auto) i4() noexcept { return get<3>(*this); }
 		[[nodiscard]] constexpr decltype(auto) i4() const noexcept { return get<3>(*this); }
+
+		[[nodiscard]] friend constexpr decltype(auto) i1(eve::like<vec4i> auto&& self) noexcept { return std::forward<decltype(self)>(self).i1(); }
+
+		[[nodiscard]] friend constexpr decltype(auto) i2(eve::like<vec4i> auto&& self) noexcept { return std::forward<decltype(self)>(self).i2(); }
+
+		[[nodiscard]] friend constexpr decltype(auto) i3(eve::like<vec4i> auto&& self) noexcept { return std::forward<decltype(self)>(self).i3(); }
+
+		[[nodiscard]] friend constexpr decltype(auto) i4(eve::like<vec4i> auto&& self) noexcept { return std::forward<decltype(self)>(self).i4(); }
 	};
 
 	// Matrix 3x3, column major, 3x4 floats
@@ -217,6 +253,12 @@ namespace gal::gsl::math
 		[[nodiscard]] constexpr decltype(auto) r2() const noexcept { return get<1>(*this); }
 		[[nodiscard]] constexpr decltype(auto) r3() noexcept { return get<2>(*this); }
 		[[nodiscard]] constexpr decltype(auto) r3() const noexcept { return get<2>(*this); }
+
+		[[nodiscard]] friend constexpr decltype(auto) r1(eve::like<mat33f> auto&& self) noexcept { return std::forward<decltype(self)>(self).r1(); }
+
+		[[nodiscard]] friend constexpr decltype(auto) r2(eve::like<mat33f> auto&& self) noexcept { return std::forward<decltype(self)>(self).r2(); }
+
+		[[nodiscard]] friend constexpr decltype(auto) r3(eve::like<mat33f> auto&& self) noexcept { return std::forward<decltype(self)>(self).r3(); }
 
 		explicit constexpr operator struct mat44f() const noexcept;
 	};
@@ -261,6 +303,14 @@ namespace gal::gsl::math
 		[[nodiscard]] constexpr decltype(auto) r3() const noexcept { return get<2>(*this); }
 		[[nodiscard]] constexpr decltype(auto) r4() noexcept { return get<3>(*this); }
 		[[nodiscard]] constexpr decltype(auto) r4() const noexcept { return get<3>(*this); }
+
+		[[nodiscard]] friend constexpr decltype(auto) r1(eve::like<mat44f> auto&& self) noexcept { return std::forward<decltype(self)>(self).r1(); }
+
+		[[nodiscard]] friend constexpr decltype(auto) r2(eve::like<mat44f> auto&& self) noexcept { return std::forward<decltype(self)>(self).r2(); }
+
+		[[nodiscard]] friend constexpr decltype(auto) r3(eve::like<mat44f> auto&& self) noexcept { return std::forward<decltype(self)>(self).r3(); }
+
+		[[nodiscard]] friend constexpr decltype(auto) r4(eve::like<mat44f> auto&& self) noexcept { return std::forward<decltype(self)>(self).r3(); }
 
 		explicit constexpr operator struct mat33f() const noexcept { return mat33f{r1(), r2(), r3()}; }
 	};
