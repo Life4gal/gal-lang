@@ -2,7 +2,7 @@
 
 #include <memory>
 
-namespace gal::gsl::core
+namespace gal::gsl::accelerate
 {
 	template<typename T, typename Deleter = ::std::default_delete<T>>
 	using unique_ptr = ::std::unique_ptr<T, Deleter>;

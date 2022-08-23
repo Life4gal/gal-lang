@@ -96,19 +96,19 @@ namespace gal::gsl::core
 		return false;
 	}
 
-	string file_accessor::splice_include_path(const file_name_view_type filename, const file_name_view_type include_filename) const
+	file_accessor::file_name_type file_accessor::splice_include_path(const file_name_view_type filename, const file_name_view_type include_filename) const
 	{
 		if (const auto p = filename.find_last_of("\\/");
 			p != file_name_view_type::npos)
 		{
-			string result{};
+			file_name_type result{};
 			result.reserve(p + 1 + include_filename.size());
 			result.append(filename.substr(0, p + 1));
 			result.append(include_filename);
 			return result;
 		}
 
-		return string{include_filename};
+		return file_name_type{include_filename};
 	}
 
 	module_info_view file_accessor::get_module_info(const file_name_view_type request, const file_name_view_type from) const

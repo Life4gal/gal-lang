@@ -1,15 +1,16 @@
 #pragma once
 
 #include <cstdint>
-#include <gsl/core/std/string.hpp>
-#include <gsl/core/std/string_view.hpp>
-#include <gsl/core/std/memory.hpp>
-#include <gsl/core/std/unordered_map.hpp>
+#include <type_traits>
+#include <gsl/accelerate/string.hpp>
+#include <gsl/accelerate/string_view.hpp>
+#include <gsl/accelerate/memory.hpp>
+#include <gsl/accelerate/unordered_map.hpp>
 
 #define GSL_ENABLE_PROFILER
 
 #ifdef GSL_ENABLE_PROFILER
-#include <gsl/core/std/vector.hpp>
+#include <gsl/accelerate/vector.hpp>
 #define GSL_ENABLE_PROFILER_DO(...) __VA_ARGS__
 #else
 	#define GSL_ENABLE_PROFILER_DO(...)
@@ -79,15 +80,15 @@ namespace gal::gsl::core
 	{
 	public:
 		using tab_size_type = std::uint32_t;
-		using source_view_type = string_view;
+		using source_view_type = accelerate::string_view;
 
 		constexpr static tab_size_type default_tab_size = 4;
 
 	private:
-		string filename_;
+		accelerate::string filename_;
 		// todo: Determine syntax based on indentation?
 		std::uint32_t tab_size_{default_tab_size};
-		GSL_ENABLE_PROFILER_DO(vector<std::uint64_t> profile_data_;)
+		GSL_ENABLE_PROFILER_DO(accelerate::vector<std::uint64_t> profile_data_;)
 
 	public:
 		// Call release_source_data before destructing file_info!
@@ -106,16 +107,16 @@ namespace gal::gsl::core
 		[[nodiscard]] constexpr virtual source_view_type get_source_view() const noexcept { return {}; }
 	};
 
-	using file_info_ptr = unique_ptr<file_info>;
+	using file_info_ptr = accelerate::unique_ptr<file_info>;
 
 	class text_file_info final : public file_info
 	{
 	public:
-		using value_type = string::value_type;
-		using size_type = string::size_type;
+		using value_type = accelerate::string::value_type;
+		using size_type = accelerate::string::size_type;
 
-		using pointer = string::pointer;
-		using const_pointer = string::const_pointer;
+		using pointer = accelerate::string::pointer;
+		using const_pointer = accelerate::string::const_pointer;
 
 	private:
 		const_pointer source_;
@@ -141,34 +142,34 @@ namespace gal::gsl::core
 
 	struct module_info
 	{
-		string filename;
-		string module_name;
-		string import_name;
+		accelerate::string filename;
+		accelerate::string module_name;
+		accelerate::string import_name;
 	};
 
 	struct module_info_view
 	{
-		string_view filename;
-		string_view module_name;
-		string_view import_name;
+		accelerate::string_view filename;
+		accelerate::string_view module_name;
+		accelerate::string_view import_name;
 	};
 
-	class file_accessor : public enable_shared_from_this<file_accessor>
+	class file_accessor : public accelerate::enable_shared_from_this<file_accessor>
 	{
 	public:
-		using file_name_type = string;
-		using file_name_view_type = string_view;
+		using file_name_type = accelerate::string;
+		using file_name_view_type = accelerate::string_view;
 
 		struct file_name_hasher
 		{
 			using is_transparent = int;
 
-			[[nodiscard]] /* constexpr */ std::size_t operator()(const string& name) const noexcept(std::is_nothrow_invocable_v<std::hash<string>, const string&>) { return std::hash<string>{}(name); }
+			[[nodiscard]] /* constexpr */ std::size_t operator()(const file_name_type& name) const noexcept(std::is_nothrow_invocable_v<std::hash<file_name_type>, const file_name_type&>) { return std::hash<file_name_type>{}(name); }
 
 			[[nodiscard]] /* constexpr */ std::size_t operator()(const file_name_view_type& name) const noexcept(std::is_nothrow_invocable_v<std::hash<file_name_view_type>, const file_name_view_type&>) { return std::hash<file_name_view_type>{}(name); }
 		};
 
-		using file_mapping_type = unordered_map<file_name_type, file_info_ptr, file_name_hasher>;
+		using file_mapping_type = accelerate::unordered_map<file_name_type, file_info_ptr, file_name_hasher>;
 
 	protected:
 		file_mapping_type files_;
@@ -205,7 +206,7 @@ namespace gal::gsl::core
 		[[nodiscard]] file_info_ptr steal(file_name_view_type name);
 		[[nodiscard]] virtual bool erase(file_name_view_type name);
 
-		[[nodiscard]] virtual string splice_include_path(file_name_view_type filename, file_name_view_type include_filename) const;
+		[[nodiscard]] virtual file_name_type splice_include_path(file_name_view_type filename, file_name_view_type include_filename) const;
 		[[nodiscard]] virtual module_info_view get_module_info(file_name_view_type request, file_name_view_type from) const;
 	};
 }
