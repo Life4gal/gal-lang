@@ -4,5 +4,8 @@
 
 namespace gal::gsl::accelerate
 {
-	using string = ::std::basic_string<char, ::std::char_traits<char>, ::std::allocator<char>>;
+	template<typename Char, typename CharTraits = ::std::char_traits<Char>, typename Allocator = ::std::allocator<Char>>
+	using basic_string = ::std::basic_string<Char, CharTraits, Allocator>;
+
+	using string = basic_string<char>;
 }

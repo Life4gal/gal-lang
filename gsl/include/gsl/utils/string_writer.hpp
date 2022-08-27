@@ -1,92 +1,49 @@
 #pragma once
 
-#include <string_view>
-#include <vector>
-#include <gsl/core/macro.hpp>
-#include <gsl/boost/logger.hpp>
+#include <cstddef>
+#include <gsl/accelerate/string.hpp>
+#include <gsl/accelerate/string_view.hpp>
 
-namespace gal::gsl::boost
+#ifndef GAL_SCRIPT_LANG_FIXED_BUFFER_SIZE
+#define GAL_SCRIPT_LANG_FIXED_BUFFER_SIZE 1 << 12
+#endif
+
+namespace gal::gsl::utils
 {
 	namespace string_writer_detail
 	{
-		constexpr std::size_t fixed_buffer_size = 1 << 12;
-
 		class fixed_buffer
 		{
+			using string_type = accelerate::string;
+			using string_view_type = accelerate::string_view;
 		public:
-			using value_type = char;
+			using value_type = string_type::value_type;
+			using size_type = string_type::size_type;
+
+			constexpr static size_type fixed_buffer_size = GAL_SCRIPT_LANG_FIXED_BUFFER_SIZE;
 
 			using buffer_type = value_type[fixed_buffer_size];
-			using size_type = std::size_t;
 
-			using pointer = value_type*;
-			using const_pointer = const value_type*;
+			using pointer = string_type::pointer;
+			using const_pointer = string_type::const_pointer;
 
 			using iterator = pointer;
 			using const_iterator = const_pointer;
 
-			using view_type = std::basic_string_view<value_type>;
+			using view_type = string_view_type;
 
 		private:
 			alignas(alignof(std::max_align_t)) buffer_type data_{};
 			size_type size_{};
 
 		public:
-			constexpr pointer allocate(const size_type size)
-			{
-				if (size + size_ <= fixed_buffer_size)
-				{
-					const pointer current = data_ + size_;
-					size_ += size;
-					return current;
-				}
+			pointer allocate(size_type size);
 
-				logger::fatal(
-						"{} --> buffer overflow, a additional size {} is required, but the remaining size is {}. (Maximum size is {}.)",
-						__func__,
-						size,
-						fixed_buffer_size - size_,
-						fixed_buffer_size);
-				GSL_UNREACHABLE();
-			}
+			void append(const_pointer source, size_type size);
 
-			constexpr void append(const const_pointer source, const size_type size)
-			{
-				if (size + size_ <= fixed_buffer_size)
-				{
-					std::memcpy(data_ + size_, source, size);
-					size_ += size;
-					return;
-				}
+			void append(const view_type view) { append(view.data(), view.size()); }
 
-				logger::fatal(
-						"{} --> buffer overflow, a additional size {} is required, but the remaining size is {}. (Maximum size is {}.)",
-						__func__,
-						size,
-						fixed_buffer_size - size_,
-						fixed_buffer_size);
-				GSL_UNREACHABLE();
-			}
-
-			constexpr void append(const view_type view) { append(view.data(), view.size()); }
-
-			constexpr void push_back(const value_type value)
-			{
-				if (1 + size_ <= fixed_buffer_size)
-				{
-					data_[size_] = value;
-					size_ += 1;
-					return;
-				}
-
-				logger::fatal(
-						"{} --> buffer overflow, a additional size {} is required, but the remaining size is {}. (Maximum size is {}.)",
-						__func__,
-						1,
-						fixed_buffer_size - size_,
-						fixed_buffer_size);
-				GSL_UNREACHABLE();
-			}
+			void push_back(value_type value);
 
 			[[nodiscard]] constexpr size_type size() const noexcept { return size_; }
 
@@ -95,22 +52,23 @@ namespace gal::gsl::boost
 
 		class vector_buffer
 		{
+			using string_type = accelerate::string;
+			using string_view_type = accelerate::string_view;
 		public:
-			using value_type = fixed_buffer::value_type;
+			using value_type = string_type::value_type;
+			using size_type = string_type::size_type;
 
-			using buffer_type = std::vector<value_type>;
-			using size_type = buffer_type::size_type;
+			using pointer = string_type::pointer;
+			using const_pointer = string_type::const_pointer;
 
-			using pointer = buffer_type::pointer;
-			using const_pointer = buffer_type::const_pointer;
+			using iterator = string_type::iterator;
+			using const_iterator = string_type::const_iterator;
 
-			using iterator = buffer_type::iterator;
-			using const_iterator = buffer_type::const_iterator;
-
-			using view_type = std::basic_string_view<value_type>;
+			using view_type = string_view_type;
+			using source_type = string_type;
 
 		private:
-			buffer_type data_{};
+			string_type data_{};
 
 		public:
 			constexpr pointer allocate(const size_type size)
@@ -133,6 +91,9 @@ namespace gal::gsl::boost
 			[[nodiscard]] constexpr size_type size() const noexcept { return data_.size(); }
 
 			[[nodiscard]] constexpr view_type view() const noexcept { return {data_.data(), data_.size()}; }
+
+			// ReSharper disable once CppNonExplicitConversionOperator
+			[[nodiscard]] constexpr operator source_type() && noexcept { return std::move(data_); }
 		};
 
 		template<typename StringWriter>
@@ -168,6 +129,18 @@ namespace gal::gsl::boost
 			[[nodiscard]] constexpr string_writer_back_insert_iterator& operator++() { return *this; }
 
 			[[nodiscard]] constexpr string_writer_back_insert_iterator& operator++(int) { return *this; }
+		};
+
+		template<typename T>
+		struct delay_source_type
+		{
+			using type = void;
+		};
+
+		template<>
+		struct delay_source_type<vector_buffer>
+		{
+			using type = vector_buffer::source_type;
 		};
 
 		template<typename BufferType>
@@ -210,6 +183,10 @@ namespace gal::gsl::boost
 			[[nodiscard]] constexpr size_type size() const noexcept { return buffer_.size(); }
 
 			[[nodiscard]] constexpr view_type view() const noexcept { return buffer_.view(); }
+
+			// ReSharper disable once CppNonExplicitConversionOperator
+			[[nodiscard]] constexpr operator typename delay_source_type<buffer_type>::type() && noexcept
+				requires std::is_same_v<buffer_type, vector_buffer> { return std::move(buffer_).operator typename buffer_type::source_type(); }
 		};
 	}
 

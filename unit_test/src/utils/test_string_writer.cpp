@@ -1,11 +1,15 @@
 #include <gtest/gtest.h>
 
-#include <gsl/boost/string_writer.hpp>
+#include <gsl/utils/string_writer.hpp>
 #include <gsl/boost/format.hpp>
+
+#include <gsl/core/runtime_info.hpp>
+#include <gsl/type/number_range.hpp>
 
 #include <iostream>
 #include <ranges>
 
+using namespace gal::gsl::utils;
 using namespace gal::gsl::boost;
 
 TEST(TestStringWriter, TestFixedStringWriter)
