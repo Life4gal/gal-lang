@@ -8,16 +8,15 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 set(
-	${PROJECT_NAME}_BOOST_SOURCE
+	${PROJECT_NAME}_UTILS_SOURCE
 
-	src/boost/test_string_writer.cpp
-	src/boost/test_vec.cpp
+	src/utils/test_string_writer.cpp
 )
 
 add_executable(
 		${PROJECT_NAME}
 		
-		${${PROJECT_NAME}_BOOST_SOURCE}
+		${${PROJECT_NAME}_UTILS_SOURCE}
 )
 
 set_compile_options_private(${PROJECT_NAME})
