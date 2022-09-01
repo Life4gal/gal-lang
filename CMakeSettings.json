@@ -1,18 +1,29 @@
 {
-	"configurations": 
-		[
-			{
-				"name": "WSL_Debug",
-				"generator": "Ninja",
-				"configurationType": "Debug",
-				"buildRoot": "${projectDir}\\WSL_Debug\\build",
-				"installRoot": "${projectDir}\\WSL_Debug\\install",
-				"cmakeExecutable": "cmake",
-				"cmakeCommandArgs": "-G \"Ninja\" -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/circle -DCONFIG_CXX_COMPILER_HAS_META=true ",
-				"buildCommandArgs": "",
-				"ctestCommandArgs": "",
-				"inheritEnvironments": ["linux_x64"],
-				"wslPath": "${defaultWSLPath}"
-			}
-		]
+  "configurations": [
+	{
+	  "name": "OUT-WSL-Debug-GCC",
+	  "generator": "Ninja",
+	  "configurationType": "Debug",
+	  "buildRoot": "${projectDir}\\${name}\\build",
+	  "installRoot": "${projectDir}\\${name}\\install",
+	  "cmakeExecutable": "cmake",
+	  "cmakeCommandArgs": "-G \"Ninja\" -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++",
+	  "buildCommandArgs": "",
+	  "ctestCommandArgs": "",
+	  "inheritEnvironments": [ "linux_x64" ],
+	  "wslPath": "${defaultWSLPath}"
+	},
+	{
+	  "name": "OUT-Native-Debug-Clang",
+	  "generator": "Ninja",
+	  "configurationType": "Debug",
+	  "buildRoot": "${projectDir}\\${name}\\build",
+	  "installRoot": "${projectDir}\\${name}\\install",
+	  "cmakeCommandArgs": "-G \"Ninja\" -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl",
+	  "buildCommandArgs": "",
+	  "ctestCommandArgs": "",
+	  "inheritEnvironments": [ "clang_cl_x64_x64" ],
+	  "variables": []
+	}
+  ]
 }

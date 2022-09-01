@@ -34,7 +34,8 @@
 /cmake-build-debug/
 /cmake-build-release/
 /build/
-/out/
+/out*/
+/OUT*/
 /ms_build/
 /ninja_build/
 /ms_install/
@@ -44,3 +45,4 @@
 *.user
 /doc/
 /WSL*/
+.vscode/

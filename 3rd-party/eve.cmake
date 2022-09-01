@@ -25,9 +25,9 @@ add_subdirectory(
 		EXCLUDE_FROM_ALL
 )
 
-set( EVE_USE_PCH             "Build unit tests with precompield headers"     OFF )
-set( EVE_BUILD_TEST          "Build unit tests for eve"                      OFF )
-set( EVE_BUILD_RANDOM        "Build random precision tests for eve"          OFF )
-set( EVE_BUILD_INTEGRATION   "Build CMake integration tests for eve"         OFF )
-set( EVE_BUILD_BENCHMARKS    "Build benchmarks for eve"                      OFF )
-set( EVE_BUILD_DOCUMENTATION "Compile Doxygen documentation"                 OFF )
+set( EVE_USE_PCH             OFF )
+set( EVE_BUILD_TEST          OFF )
+set( EVE_BUILD_RANDOM        OFF )
+set( EVE_BUILD_INTEGRATION   OFF )
+set( EVE_BUILD_BENCHMARKS    OFF )
+set( EVE_BUILD_DOCUMENTATION OFF )
