@@ -6,11 +6,7 @@ toc::[]
 
 == Introduction
 
-**GAL** language is one of the embedded scripting language designed from the ground up to directly target pass:[C++] and take advantage of modern pass:[C++] development techniques, working with the developer how they would expect it to work. Being a native pass:[C++] application, it has some advantages over existing embedded scripting languages:
-
-. It uses a header-only approach, which makes it easy to integrate with existing projects. +
-. It maintains type safety between your pass:[C++] application and the user scripts. +
-. It supports a variety of pass:[C++] techniques including callbacks, overloaded functions, class methods, and stl containers. +
+todo
 
 == Note
 
@@ -22,9 +18,7 @@ The GAL is written based on the pass:[C++23] standard. The code for the GAL is c
 
 == Installation
 
-```bash
-./generate_configuration.sh
-```
+todo
 
 == Usage
 
