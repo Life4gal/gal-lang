@@ -1,33 +1,9 @@
 #include <gsl/core/runtime_info.hpp>
-
-#include <gsl/boost/raw_memory.hpp>
-#include <algorithm>
 #include <ranges>
+#include <algorithm>
 
 namespace gal::gsl::core
 {
-	file_info::~file_info() = default;
-
-	void file_info::reserve_data_for_profile()
-	{
-		GSL_ENABLE_PROFILER_DO(
-				profile_data_.reserve(
-					std::ranges::count(get_source_view(), '\n') + 2
-				);
-				)
-	}
-
-	void text_file_info::release_source_data() noexcept
-	{
-		if (owned_ && source_)
-		{
-			boost::default_allocator::dealloc(const_cast<pointer>(source_));
-			source_ = nullptr;
-			length_ = 0;
-			owned_ = false;
-		}
-	}
-
 	file_accessor::~file_accessor() = default;
 
 	void file_accessor::release_file_source() noexcept

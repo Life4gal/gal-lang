@@ -1,114 +1,15 @@
 #pragma once
 
-#include <cstdint>
-#include <type_traits>
-#include <gsl/accelerate/string.hpp>
-#include <gsl/accelerate/string_view.hpp>
-#include <gsl/accelerate/memory.hpp>
-#include <gsl/accelerate/unordered_map.hpp>
-
 #define GSL_ENABLE_PROFILER
 
-#ifdef GSL_ENABLE_PROFILER
-#include <gsl/accelerate/vector.hpp>
-#define GSL_ENABLE_PROFILER_DO(...) __VA_ARGS__
-#else
-	#define GSL_ENABLE_PROFILER_DO(...)
-#endif
+#include <gsl/core/core_detail/type_traits.hpp>
+#include <gsl/core/core_detail/line_info.hpp>
+#include <gsl/core/core_detail/file_info.hpp>
+#include <gsl/core/core_detail/file_accessor.hpp>
+#include <gsl/core/core_detail/core_type.hpp>
 
 namespace gal::gsl::core
 {
-	enum runtime_type
-	{
-		none,
-		any,
-		auto_infer,
-		alias,
-
-		void_type,
-		bool_type,
-
-		int8_type,
-		uint8_type,
-		int16_type,
-		uint16_type,
-		int32_type,
-		uint32_type,
-		int64_type,
-		uint64_type,
-		float_type,
-		double_type,
-
-		range_type,
-		string_type,
-		array_type,
-		tuple_type,
-		table_type,
-		enumeration,
-		variant_type,
-
-		function_type,
-		lambda_type,
-	};
-
-	enum class is_reference
-	{
-		yes,
-		no,
-	};
-
-	enum class is_const
-	{
-		yes,
-		no,
-	};
-
-	// ReSharper disable once IdentifierTypo
-	enum class is_xvalue
-	{
-		yes,
-		no,
-	};
-
-	template<typename T>
-	concept cloneable_t = requires
-	{
-		std::is_copy_constructible_v<T> && std::is_copy_assignable_v<T>;
-	};
-
-	class file_info
-	{
-	public:
-		using tab_size_type = std::uint32_t;
-		using source_view_type = accelerate::string_view;
-
-		constexpr static tab_size_type default_tab_size = 4;
-
-	private:
-		accelerate::string filename_;
-		// todo: Determine syntax based on indentation?
-		std::uint32_t tab_size_{default_tab_size};
-		GSL_ENABLE_PROFILER_DO(accelerate::vector<std::uint64_t> profile_data_;)
-
-	public:
-		// Call release_source_data before destructing file_info!
-		virtual ~file_info();
-		constexpr file_info() = default;
-		constexpr file_info(const file_info&) = default;
-		constexpr file_info& operator=(const file_info&) = default;
-		constexpr file_info(file_info&&) = default;
-		constexpr file_info& operator=(file_info&&) = default;
-
-		constexpr void set_filename(const source_view_type filename) { filename_ = filename; }
-
-		void reserve_data_for_profile();
-
-		virtual void release_source_data() noexcept {}
-		[[nodiscard]] constexpr virtual source_view_type get_source_view() const noexcept { return {}; }
-	};
-
-	using file_info_ptr = accelerate::unique_ptr<file_info>;
-
 	class text_file_info final : public file_info
 	{
 	public:
@@ -140,73 +41,29 @@ namespace gal::gsl::core
 		[[nodiscard]] constexpr source_view_type get_source_view() const noexcept override { return {source_, length_}; }
 	};
 
-	struct module_info
+	class module_context;
+	class module_function;
+
+	class module_file_accessor final : public file_accessor
 	{
-		accelerate::string filename;
-		accelerate::string module_name;
-		accelerate::string import_name;
-	};
-
-	struct module_info_view
-	{
-		accelerate::string_view filename;
-		accelerate::string_view module_name;
-		accelerate::string_view import_name;
-	};
-
-	class file_accessor : public accelerate::enable_shared_from_this<file_accessor>
-	{
-	public:
-		using file_name_type = accelerate::string;
-		using file_name_view_type = accelerate::string_view;
-
-		struct file_name_hasher
-		{
-			using is_transparent = int;
-
-			[[nodiscard]] /* constexpr */ std::size_t operator()(const file_name_type& name) const noexcept(std::is_nothrow_invocable_v<std::hash<file_name_type>, const file_name_type&>) { return std::hash<file_name_type>{}(name); }
-
-			[[nodiscard]] /* constexpr */ std::size_t operator()(const file_name_view_type& name) const noexcept(std::is_nothrow_invocable_v<std::hash<file_name_view_type>, const file_name_view_type&>) { return std::hash<file_name_view_type>{}(name); }
-		};
-
-		using file_mapping_type = accelerate::unordered_map<file_name_type, file_info_ptr, file_name_hasher>;
-
 	protected:
-		file_mapping_type files_;
-
-		[[nodiscard]] virtual file_info* build_new_file_info(const file_name_view_type name)
-		{
-			(void)name;
-			return nullptr;
-		}
+		// accelerate::unique_ptr<module_context> context_;
+		module_context* context_{nullptr};
+		module_function* module_getter_{nullptr};
+		module_function* module_include_getter_{nullptr};
+		module_function* module_allow_checker_{nullptr};
 
 	public:
-		virtual ~file_accessor();
-		file_accessor(const file_accessor&) = default;
-		file_accessor& operator=(const file_accessor&) = default;
-		file_accessor(file_accessor&&) = default;
-		file_accessor& operator=(file_accessor&&) = default;
+		module_file_accessor() = default;
+		module_file_accessor(file_name_view_type pak, const file_accessor_ptr& accessor);
 
-		// Clears all file data but does not clear file records.
-		void release_file_source() noexcept;
+		[[nodiscard]] bool valid() const noexcept { return context_ && module_getter_; }
 
-		// Clears everything.
-		void clear() noexcept
-		{
-			release_file_source();
-			files_.clear();
-		}
-
-		// If it does not exist, call build_new_file_info to create a new one.
-		// Returns nullptr if it cannot be created.
-		[[nodiscard]] file_info* get(file_name_view_type name);
-		// If it does not exist, return nullptr directly.
-		[[nodiscard]] file_info* get(file_name_view_type name) const;
-		file_info* set(file_name_view_type name, file_info_ptr&& file_info);
-		[[nodiscard]] file_info_ptr steal(file_name_view_type name);
-		[[nodiscard]] virtual bool erase(file_name_view_type name);
-
-		[[nodiscard]] virtual file_name_type splice_include_path(file_name_view_type filename, file_name_view_type include_filename) const;
-		[[nodiscard]] virtual module_info_view get_module_info(file_name_view_type request, file_name_view_type from) const;
+		[[nodiscard]] file_name_type splice_include_path(file_name_view_type filename, file_name_view_type include_filename) const override;
+		[[nodiscard]] module_info_view get_module_info(file_name_view_type request, file_name_view_type from) const override;
+		[[nodiscard]] bool is_module_allowed(file_name_view_type module_name, file_name_view_type filename) const override;
 	};
+
+	template<>
+	struct is_cloneable<module_file_accessor> : std::false_type {};
 }

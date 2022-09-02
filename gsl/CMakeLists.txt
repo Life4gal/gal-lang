@@ -6,6 +6,10 @@ project(
 set(
 	${PROJECT_NAME}_CORE_SOURCE
 
+	src/core/core_detail/line_info.cpp
+	src/core/core_detail/file_info.cpp
+	src/core/core_detail/file_accessor.cpp
+
 	src/core/runtime_info.cpp
 	src/core/module_file_accessor.cpp
 )
@@ -13,13 +17,13 @@ set(
 set(
 	${PROJECT_NAME}_UTILS_SOURCE
 
-	src/utils/string_writer.cpp
+
 )
 
 set(
 	${PROJECT_NAME}_BOOST_SOURCE
 
-	src/boost/raw_memory.cpp
+	
 )
 
 add_library(
