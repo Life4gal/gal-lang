@@ -26,6 +26,10 @@ namespace gal::gsl
 			friend type_descriptor;
 		private:
 			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(boolean::data_type); }
+
+			constexpr static auto copy_into_impl(void* dest, const void* source, const size_type count) -> void { std::ranges::copy(static_cast<const boolean*>(source), static_cast<const boolean*>(source) + count, static_cast<boolean*>(dest)); }
+
+			constexpr static auto move_into_impl(void* dest, void* source, const size_type count) -> void { std::ranges::move(static_cast<boolean*>(source), static_cast<boolean*>(source) + count, static_cast<boolean*>(dest)); }
 		};
 	}// namespace type
 

@@ -22,6 +22,10 @@ namespace gal::gsl
 
 		private:
 			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(vec4f); }
+
+			constexpr static auto copy_into_impl(void* dest, const void* source, const size_type count) -> void { std::ranges::copy(static_cast<const vec4f*>(source), static_cast<const vec4f*>(source) + count, static_cast<vec4f*>(dest)); }
+
+			constexpr static auto move_into_impl(void* dest, void* source, const size_type count) -> void { std::ranges::move(static_cast<vec4f*>(source), static_cast<vec4f*>(source) + count, static_cast<vec4f*>(dest)); }
 		};
 
 		struct vec4i_descriptor : public type_descriptor
@@ -30,6 +34,10 @@ namespace gal::gsl
 
 		private:
 			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(vec4i); }
+
+			constexpr static auto copy_into_impl(void* dest, const void* source, const size_type count) -> void { std::ranges::copy(static_cast<const vec4i*>(source), static_cast<const vec4i*>(source) + count, static_cast<vec4i*>(dest)); }
+
+			constexpr static auto move_into_impl(void* dest, void* source, const size_type count) -> void { std::ranges::move(static_cast<vec4i*>(source), static_cast<vec4i*>(source) + count, static_cast<vec4i*>(dest)); }
 		};
 
 		struct vec4u_descriptor : public type_descriptor
@@ -38,6 +46,10 @@ namespace gal::gsl
 
 		private:
 			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(vec4u); }
+
+			constexpr static auto copy_into_impl(void* dest, const void* source, const size_type count) -> void { std::ranges::copy(static_cast<const vec4u*>(source), static_cast<const vec4u*>(source) + count, static_cast<vec4u*>(dest)); }
+
+			constexpr static auto move_into_impl(void* dest, void* source, const size_type count) -> void { std::ranges::move(static_cast<vec4u*>(source), static_cast<vec4u*>(source) + count, static_cast<vec4u*>(dest)); }
 		};
 	}
 
