@@ -1,4 +1,3 @@
-#include <gsl/core/runtime_info.hpp>
 #include <iostream>
 
 int main()

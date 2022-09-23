@@ -3,27 +3,12 @@ project(
 		LANGUAGES CXX
 )
 
-set(
-	${PROJECT_NAME}_CORE_SOURCE
+file(
+	GLOB_RECURSE  
+	${PROJECT_NAME}_SOURCE 
+	CONFIGURE_DEPENDS 
 
-	src/core/core_detail/line_info.cpp
-	src/core/core_detail/file_info.cpp
-	src/core/core_detail/file_accessor.cpp
-
-	src/core/runtime_info.cpp
-	src/core/module_file_accessor.cpp
-)
-
-set(
-	${PROJECT_NAME}_UTILS_SOURCE
-
-
-)
-
-set(
-	${PROJECT_NAME}_BOOST_SOURCE
-
-	
+	${PROJECT_SOURCE_DIR}/src/*.cpp
 )
 
 add_library(
@@ -31,9 +16,7 @@ add_library(
 	# todo
 	STATIC
 
-	${${PROJECT_NAME}_CORE_SOURCE}
-	${${PROJECT_NAME}_UTILS_SOURCE}
-	${${PROJECT_NAME}_BOOST_SOURCE}
+	${${PROJECT_NAME}_SOURCE}
 )
 
 target_include_directories(
@@ -73,26 +56,10 @@ target_compile_definitions(
 
 set(CMAKE_CXX_STANDARD 23)
 set_compile_options_private(${PROJECT_NAME})
+turn_off_warning(${PROJECT_NAME})
 
-include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/eve.cmake)
-include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/foonathan-memory.cmake)
-include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/spdlog.cmake)
+CPM_link_libraries_DECL()
 include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/fmtlib.cmake)
-
-target_compile_definitions(
-	${PROJECT_NAME}
-	PUBLIC
-
-	SPDLOG_FMT_EXTERNAL
-)
-
-target_link_libraries(
-	${PROJECT_NAME}
-	PUBLIC
-
-	eve::eve
-	foonathan_memory
-	fmt::fmt
-	# spdlog
-	spdlog_header_only
-)
+include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/spdlog.cmake)
+include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/eve.cmake)
+CPM_link_libraries_LINK()
