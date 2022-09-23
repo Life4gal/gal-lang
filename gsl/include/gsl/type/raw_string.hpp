@@ -1,5 +1,7 @@
 #pragma once
 
+#include <gsl/type/type_descriptor.hpp>
+
 namespace gal::gsl
 {
 	namespace type
@@ -18,6 +20,14 @@ namespace gal::gsl
 				: data{data} {}
 
 			constexpr explicit(false) operator data_type() const noexcept { return data; }
+		};
+
+		struct raw_string_descriptor : public type_descriptor
+		{
+			friend type_descriptor;
+
+		private:
+			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(raw_string::data_type); }
 		};
 	}
 

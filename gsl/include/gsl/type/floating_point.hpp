@@ -1,5 +1,7 @@
 #pragma once
 
+#include <gsl/type/type_descriptor.hpp>
+
 namespace gal::gsl
 {
 	namespace type
@@ -32,6 +34,22 @@ namespace gal::gsl
 				: data{data} {}
 
 			constexpr explicit(false) operator data_type() const noexcept { return data; }
+		};
+
+		struct single_precision_descriptor : public type_descriptor
+		{
+			friend type_descriptor;
+
+		private:
+			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(single_precision::data_type); }
+		};
+
+		struct double_precision_descriptor : public type_descriptor
+		{
+			friend type_descriptor;
+
+		private:
+			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(double_precision::data_type); }
 		};
 	}
 

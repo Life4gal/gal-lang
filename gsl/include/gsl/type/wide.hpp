@@ -2,6 +2,7 @@
 
 #include <bit>
 #include <eve/wide.hpp>
+#include <gsl/type/type_descriptor.hpp>
 
 namespace gal::gsl
 {
@@ -14,6 +15,30 @@ namespace gal::gsl
 		static_assert(sizeof(vec4f) == sizeof(core::Value));
 		static_assert(sizeof(vec4i) == sizeof(core::Value));
 		static_assert(sizeof(vec4u) == sizeof(core::Value));
+
+		struct vec4f_descriptor : public type_descriptor
+		{
+			friend type_descriptor;
+
+		private:
+			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(vec4f); }
+		};
+
+		struct vec4i_descriptor : public type_descriptor
+		{
+			friend type_descriptor;
+
+		private:
+			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(vec4i); }
+		};
+
+		struct vec4u_descriptor : public type_descriptor
+		{
+			friend type_descriptor;
+
+		private:
+			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(vec4u); }
+		};
 	}
 
 	namespace core

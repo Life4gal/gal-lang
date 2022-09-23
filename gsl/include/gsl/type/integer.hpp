@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <gsl/type/type_descriptor.hpp>
 
 namespace gal::gsl
 {
@@ -64,6 +65,38 @@ namespace gal::gsl
 				: data{data} {}
 
 			constexpr explicit(false) operator data_type() const noexcept { return data; }
+		};
+
+		struct signed_integer_descriptor : public type_descriptor
+		{
+			friend type_descriptor;
+
+		private:
+			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(signed_integer::data_type); }
+		};
+
+		struct unsigned_integer_descriptor : public type_descriptor
+		{
+			friend type_descriptor;
+
+		private:
+			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(unsigned_integer::data_type); }
+		};
+
+		struct signed_long_integer_descriptor : public type_descriptor
+		{
+			friend type_descriptor;
+
+		private:
+			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(signed_long_integer::data_type); }
+		};
+
+		struct unsigned_long_integer_descriptor : public type_descriptor
+		{
+			friend type_descriptor;
+
+		private:
+			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(unsigned_long_integer::data_type); }
 		};
 	}
 
