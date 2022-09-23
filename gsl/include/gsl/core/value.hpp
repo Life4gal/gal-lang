@@ -14,6 +14,8 @@ namespace gal::gsl::core
 		union alignas(alignof(std::max_align_t))
 		{
 			char bits[16];
+			void* raw_pointer;
+			const void* raw_observer;
 			std::int32_t signed_integer_32[4];
 			std::uint32_t unsigned_integer_32[4];
 			std::int64_t signed_integer_64[2];
