@@ -2,7 +2,7 @@
 
 namespace gal::gsl::type
 {
-	auto Vector::lock(core::ModuleContext& context) -> void
+	auto Vector::lock(core::ModuleContext& context) const -> void
 	{
 		if (shared || dead) { return; }
 
@@ -12,7 +12,7 @@ namespace gal::gsl::type
 		(void)context;
 	}
 
-	auto Vector::unlock(core::ModuleContext& context) -> void
+	auto Vector::unlock(core::ModuleContext& context) const -> void
 	{
 		if (shared || dead) { return; }
 
@@ -45,6 +45,7 @@ namespace gal::gsl::type
 	{
 		if (is_locked())
 		{
+			(void)context;
 			// todo: cannot change a vector's size if it locked
 			return;
 		}
@@ -68,5 +69,18 @@ namespace gal::gsl::type
 		}
 
 		size_ = 0;
+	}
+
+	auto Vector::clear(const data_type table_keys) -> bool
+	{
+		if (data_)
+		{
+			std::memset(data_, 0, table_keys - data_);
+			size_ = 0;
+			return true;
+		}
+
+		size_ = 0;
+		return false;
 	}
 }

@@ -18,7 +18,7 @@ namespace gal::gsl
 		{
 			friend struct vector_descriptor;
 		public:
-			using data_type = char*;
+			using data_type = type_descriptor::raw_memory_type;
 			using size_type = std::uint32_t;
 			using lock_type = std::uint32_t;
 			using flag_type = std::uint32_t;
@@ -27,7 +27,7 @@ namespace gal::gsl
 			data_type data_{nullptr};
 			size_type size_{0};
 			size_type capacity_{0};
-			lock_type lock_{0};
+			mutable lock_type lock_{0};
 
 			union
 			{
@@ -44,12 +44,19 @@ namespace gal::gsl
 			[[nodiscard]] constexpr auto is_locked() const noexcept -> lock_type { return lock_; }
 			[[nodiscard]] constexpr auto lock_count() const noexcept -> lock_type { return lock_; }
 
-			auto lock(core::ModuleContext& context) -> void;
-			auto unlock(core::ModuleContext& context) -> void;
+			auto lock(core::ModuleContext& context) const -> void;
+			auto unlock(core::ModuleContext& context) const -> void;
 
 			auto reserve(core::ModuleContext& context, size_type new_capacity, type_descriptor::size_type type_size) -> void;
 			auto resize(core::ModuleContext& context, size_type new_size, type_descriptor::size_type type_size, bool zero_it) -> void;
 			auto clear(core::ModuleContext& context) -> void;
+
+		private:
+			// for table
+			friend class Table;
+
+			// This `clear` does not check the `lock`!
+			auto clear(const data_type table_keys) -> bool;
 		};
 
 		struct vector_descriptor : public type_descriptor
@@ -79,7 +86,7 @@ namespace gal::gsl
 							// todo: how about lock?
 							// dest->lock_ = s.lock_;
 							// todo: how about non-trivial type?
-							utils::gsl_assert(dest->data_ != nullptr, "dest vector should allocate memory before copy!");
+							gsl_assert(dest->data_ != nullptr, "dest vector should allocate memory before copy!");
 							std::ranges::copy(s.data_, s.data_ + s.size_, dest->data_);
 							// next one
 							++dest;
