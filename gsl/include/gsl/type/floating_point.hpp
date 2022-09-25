@@ -43,6 +43,14 @@ namespace gal::gsl
 		private:
 			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(single_precision::data_type); }
 
+			constexpr static auto zero_out_impl(void* dest, const size_type count) noexcept -> void
+			{
+				std::ranges::for_each(
+						static_cast<single_precision*>(dest),
+						static_cast<single_precision*>(dest) + count,
+						[](single_precision& d) { d = {0}; });
+			}
+
 			constexpr static auto copy_into_impl(void* dest, const void* source, const size_type count) -> void { std::ranges::copy(static_cast<const single_precision*>(source), static_cast<const single_precision*>(source) + count, static_cast<single_precision*>(dest)); }
 
 			constexpr static auto move_into_impl(void* dest, void* source, const size_type count) -> void { std::ranges::move(static_cast<single_precision*>(source), static_cast<single_precision*>(source) + count, static_cast<single_precision*>(dest)); }
@@ -54,6 +62,14 @@ namespace gal::gsl
 
 		private:
 			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(double_precision::data_type); }
+
+			constexpr static auto zero_out_impl(void* dest, const size_type count) noexcept -> void
+			{
+				std::ranges::for_each(
+						static_cast<double_precision*>(dest),
+						static_cast<double_precision*>(dest) + count,
+						[](double_precision& d) { d = {0}; });
+			}
 
 			constexpr static auto copy_into_impl(void* dest, const void* source, const size_type count) -> void { std::ranges::copy(static_cast<const double_precision*>(source), static_cast<const double_precision*>(source) + count, static_cast<double_precision*>(dest)); }
 

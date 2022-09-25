@@ -29,6 +29,14 @@ namespace gal::gsl
 		private:
 			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(raw_string::data_type); }
 
+			constexpr static auto zero_out_impl(void* dest, const size_type count) noexcept -> void
+			{
+				std::ranges::for_each(
+						static_cast<raw_string*>(dest),
+						static_cast<raw_string*>(dest) + count,
+						[](raw_string& d) { d = {nullptr}; });
+			}
+
 			constexpr static auto copy_into_impl(void* dest, const void* source, const size_type count) -> void { std::ranges::copy(static_cast<const raw_string*>(source), static_cast<const raw_string*>(source) + count, static_cast<raw_string*>(dest)); }
 
 			constexpr static auto move_into_impl(void* dest, void* source, const size_type count) -> void { std::ranges::move(static_cast<raw_string*>(source), static_cast<raw_string*>(source) + count, static_cast<raw_string*>(dest)); }

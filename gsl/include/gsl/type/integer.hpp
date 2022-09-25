@@ -74,6 +74,14 @@ namespace gal::gsl
 		private:
 			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(signed_integer::data_type); }
 
+			constexpr static auto zero_out_impl(void* dest, const size_type count) noexcept -> void
+			{
+				std::ranges::for_each(
+						static_cast<signed_integer*>(dest),
+						static_cast<signed_integer*>(dest) + count,
+						[](signed_integer& d) { d = {0}; });
+			}
+
 			constexpr static auto copy_into_impl(void* dest, const void* source, const size_type count) -> void { std::ranges::copy(static_cast<const signed_integer*>(source), static_cast<const signed_integer*>(source) + count, static_cast<signed_integer*>(dest)); }
 
 			constexpr static auto move_into_impl(void* dest, void* source, const size_type count) -> void { std::ranges::move(static_cast<signed_integer*>(source), static_cast<signed_integer*>(source) + count, static_cast<signed_integer*>(dest)); }
@@ -85,6 +93,14 @@ namespace gal::gsl
 
 		private:
 			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(unsigned_integer::data_type); }
+
+			constexpr static auto zero_out_impl(void* dest, const size_type count) noexcept -> void
+			{
+				std::ranges::for_each(
+						static_cast<unsigned_integer*>(dest),
+						static_cast<unsigned_integer*>(dest) + count,
+						[](unsigned_integer& d) { d = {0}; });
+			}
 
 			constexpr static auto copy_into_impl(void* dest, const void* source, const size_type count) -> void { std::ranges::copy(static_cast<const unsigned_integer*>(source), static_cast<const unsigned_integer*>(source) + count, static_cast<unsigned_integer*>(dest)); }
 
@@ -98,6 +114,14 @@ namespace gal::gsl
 		private:
 			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(signed_long_integer::data_type); }
 
+			constexpr static auto zero_out_impl(void* dest, const size_type count) noexcept -> void
+			{
+				std::ranges::for_each(
+						static_cast<signed_long_integer*>(dest),
+						static_cast<signed_long_integer*>(dest) + count,
+						[](signed_long_integer& d) { d = {0}; });
+			}
+
 			constexpr static auto copy_into_impl(void* dest, const void* source, const size_type count) -> void { std::ranges::copy(static_cast<const signed_long_integer*>(source), static_cast<const signed_long_integer*>(source) + count, static_cast<signed_long_integer*>(dest)); }
 
 			constexpr static auto move_into_impl(void* dest, void* source, const size_type count) -> void { std::ranges::move(static_cast<signed_long_integer*>(source), static_cast<signed_long_integer*>(source) + count, static_cast<signed_long_integer*>(dest)); }
@@ -109,6 +133,14 @@ namespace gal::gsl
 
 		private:
 			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(unsigned_long_integer::data_type); }
+
+			constexpr static auto zero_out_impl(void* dest, const size_type count) noexcept -> void
+			{
+				std::ranges::for_each(
+						static_cast<unsigned_long_integer*>(dest),
+						static_cast<unsigned_long_integer*>(dest) + count,
+						[](unsigned_long_integer& d) { d = {0}; });
+			}
 
 			constexpr static auto copy_into_impl(void* dest, const void* source, const size_type count) -> void { std::ranges::copy(static_cast<const unsigned_long_integer*>(source), static_cast<const unsigned_long_integer*>(source) + count, static_cast<unsigned_long_integer*>(dest)); }
 
