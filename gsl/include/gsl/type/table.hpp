@@ -15,7 +15,7 @@ namespace gal::gsl::type
 		using hash_type = std::uint64_t;
 		using lock_type = Vector::lock_type;
 
-	private:
+	protected:
 		const Table& table_;
 		size_type type_size_;
 		data_type begin_;
@@ -38,6 +38,26 @@ namespace gal::gsl::type
 		[[nodiscard]] virtual auto data() const -> data_type = 0;
 	};
 
+	class TableKeysIterator final : public TableIterator
+	{
+	public:
+		using TableIterator::TableIterator;
+
+		auto done(core::ModuleContext& context) -> void override;
+
+		[[nodiscard]] auto data() const -> data_type override;
+	};
+
+	class TableValuesIterator final : public TableIterator
+	{
+	public:
+		using TableIterator::TableIterator;
+
+		auto done(core::ModuleContext& context) -> void override;
+
+		[[nodiscard]] auto data() const -> data_type override;
+	};
+
 	class Table
 	{
 	public:
@@ -53,6 +73,14 @@ namespace gal::gsl::type
 		size_type shift_{0};
 		Vector data_{};
 
+		// for iterator
+		friend TableKeysIterator;
+		friend TableValuesIterator;
+
+		[[nodiscard]] auto keys() const -> std::add_const_t<data_type> { return keys_; }
+
+		[[nodiscard]] auto values() const -> std::add_const_t<data_type> { return data_.values(); }
+
 	public:
 		[[nodiscard]] constexpr auto size() const noexcept -> size_type { return data_.size(); }
 		[[nodiscard]] constexpr auto capacity() const noexcept -> size_type { return data_.capacity(); }
@@ -67,7 +95,7 @@ namespace gal::gsl::type
 		[[nodiscard]] auto keys(core::ModuleContext& context, size_type type_size) -> sequence;
 		[[nodiscard]] auto values(core::ModuleContext& context, size_type type_size) -> sequence;
 
-		[[nodiscard]] auto			 hash(const std::ptrdiff_t index) const noexcept -> hash_type
+		[[nodiscard]] auto hash(const std::ptrdiff_t index) const noexcept -> hash_type
 		{
 			gsl_assert(index < capacity(), "index out of range!");
 			return hashes_[index];

@@ -22,6 +22,32 @@ namespace gal::gsl::type
 		return table_.size();
 	}
 
+	auto TableIterator::next(core::ModuleContext& context, data_type output) -> bool
+	{
+		const auto data = this->data();
+		const auto index = next_valid_index((begin_ - data) / type_size_ + 1);
+		begin_ = data + index * type_size_;
+		*reinterpret_cast<pointer>(output) = begin_;
+		return begin_ != end_;
+	}
+
+	auto TableIterator::done(core::ModuleContext& context) -> void { table_.unlock(context); }
+
+	auto TableKeysIterator::done(core::ModuleContext& context) -> void
+	{
+		TableIterator::done(context);
+		// todo: free self
+	}
+
+	auto TableKeysIterator::data() const -> data_type { return table_.keys(); }
+
+	auto TableValuesIterator::done(core::ModuleContext& context) -> void
+	{
+		TableIterator::done(context);
+		// todo self
+	}
+
+	auto TableValuesIterator::data() const -> data_type { return table_.values(); }
 
 	auto Table::lock(core::ModuleContext& context) const -> void { data_.lock(context); }
 

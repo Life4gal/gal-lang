@@ -56,7 +56,9 @@ namespace gal::gsl
 			friend class Table;
 
 			// This `clear` does not check the `lock`!
-			auto clear(const data_type table_keys) -> bool;
+			auto clear(data_type table_keys) -> bool;
+
+			[[nodiscard]] auto values() const -> std::add_const_t<data_type> { return data_; }
 		};
 
 		struct vector_descriptor : public type_descriptor
