@@ -11,9 +11,6 @@ namespace gal::gsl
 		auto freeze_here() -> void;
 	}
 
-	using heap_data_type = char*;
-	using heap_data_size_type = std::uint32_t;
-
 	template<typename SizeType, typename DataType>
 		requires std::is_integral_v<SizeType> && std::is_pointer_v<DataType>
 	class HeapSmallAllocationPolicy
@@ -36,6 +33,8 @@ namespace gal::gsl
 			size_type index;
 			size_type offset;
 			size_type mask;
+
+			[[nodiscard]] constexpr auto operator==(const descriptor_state& other) const noexcept -> bool = default;
 		};
 
 		constexpr static descriptor_state bad_descriptor{
@@ -43,7 +42,7 @@ namespace gal::gsl
 				.offset = static_cast<size_type>(-1),
 				.mask = static_cast<size_type>(-1)};
 
-		[[nodiscard]] constexpr static descriptor_state get_descriptor_state(const data_type root, const size_type capacity, const size_type size_per_element, const data_type this_data) noexcept
+		[[nodiscard]] constexpr static auto get_descriptor_state(const data_type root, const size_type capacity, const size_type size_per_element, const data_type this_data) noexcept -> descriptor_state
 		{
 			std::ptrdiff_t test_index = (this_data - root) / size_per_element;
 			if (test_index < 0 || test_index >= capacity)
@@ -59,9 +58,17 @@ namespace gal::gsl
 		}
 	};
 
+	using heap_data_type = char*;
+	using heap_data_size_type = std::uint32_t;
+	using heap_small_allocation_policy = HeapSmallAllocationPolicy<heap_data_size_type, heap_data_type>;
+	constexpr heap_data_size_type kHeapSmallAllocationThreshold = 1 << 8;
+
+	#define GSL_ALLOCATIONS_TRACK
+	#define GSL_ALLOCATIONS_SANITIZER
+
 	namespace heap
 	{
-		using data_type = heap_data_type;
+		using data_type = void*;
 		using size_type = heap_data_size_type;
 
 		[[nodiscard]] auto allocate(size_type size) -> data_type;

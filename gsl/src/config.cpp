@@ -29,8 +29,7 @@ namespace gal::gsl
 			void* data = nullptr;
 			if (posix_memalign(&data, alignof(std::max_align_t), size))
 			{
-				debug::freeze_here();
-				gsl_assert(false, "posix_memalign returned nullptr");
+				gsl_trap("posix_memalign returned nullptr");
 				return nullptr;
 			}
 			return static_cast<data_type>(data);
