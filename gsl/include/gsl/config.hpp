@@ -11,22 +11,31 @@ namespace gal::gsl
 		auto freeze_here() -> void;
 	}
 
-	template<typename SizeType, typename DataType>
-		requires std::is_integral_v<SizeType> && std::is_pointer_v<DataType>
+	using heap_data_type = char*;
+	using heap_data_size_type = std::uint32_t;
+
+	template<typename AlignedType>
+		requires std::is_integral_v<AlignedType>
 	class HeapSmallAllocationPolicy
 	{
 	public:
-		using size_type = SizeType;
-		using data_type = DataType;
+		using size_type = heap_data_size_type;
+		using data_type = heap_data_type;
 
-		constexpr static size_type size_type_size = sizeof(size_type);
+		using aligned_type = AlignedType;
+
+		template<typename NewAlignedSize>
+			requires std::is_integral_v<NewAlignedSize>
+		using rebind_policy = HeapSmallAllocationPolicy<NewAlignedSize>;
+
+		constexpr static size_type size_type_size = sizeof(aligned_type);
 		constexpr static size_type size_type_bit_size = size_type_size * 8;
 		constexpr static size_type size_type_mask = size_type_bit_size - 1;
 		constexpr static size_type size_type_offset = size_type_size + 1;
 
-		[[nodiscard]] constexpr static auto get_fit_capacity(const size_type capacity) noexcept -> size_type { return (capacity + size_type_mask) & ~size_type_mask; }
+		[[nodiscard]] constexpr static auto get_fit_aligned_size(const size_type size) noexcept -> size_type { return (size + size_type_mask) & ~size_type_mask; }
 
-		[[nodiscard]] constexpr static auto get_descriptor_count(const size_type fit_capacity) noexcept -> size_type { return fit_capacity / 8; }
+		[[nodiscard]] constexpr static auto get_descriptor_count(const size_type fit_aligned_size) noexcept -> size_type { return fit_aligned_size / 8; }
 
 		struct descriptor_state
 		{
@@ -44,7 +53,7 @@ namespace gal::gsl
 
 		[[nodiscard]] constexpr static auto get_descriptor_state(const data_type root, const size_type capacity, const size_type size_per_element, const data_type this_data) noexcept -> descriptor_state
 		{
-			std::ptrdiff_t test_index = (this_data - root) / size_per_element;
+			const std::ptrdiff_t test_index = (this_data - root) / size_per_element;
 			if (test_index < 0 || test_index >= capacity)
 			{
 				// todo: let it crash
@@ -58,9 +67,7 @@ namespace gal::gsl
 		}
 	};
 
-	using heap_data_type = char*;
-	using heap_data_size_type = std::uint32_t;
-	using heap_small_allocation_policy = HeapSmallAllocationPolicy<heap_data_size_type, heap_data_type>;
+	using heap_small_allocation_policy = HeapSmallAllocationPolicy<std::uint32_t>;
 	constexpr heap_data_size_type kHeapSmallAllocationThreshold = 1 << 8;
 
 	#define GSL_ALLOCATIONS_TRACK

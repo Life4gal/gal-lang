@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <gsl/config.hpp>
 
 namespace gal::gsl::utils
@@ -45,7 +46,7 @@ namespace gal::gsl::utils
 
 		public:
 			Hole(const size_type capacity, const size_type size_per_prey, Hole* next)
-				: capacity_{policy_type::get_fit_capacity(capacity)},
+				: capacity_{policy_type::get_fit_aligned_size(capacity)},
 				size_per_prey_{size_per_prey},
 				hole_{static_cast<data_type>(heap::allocate(capacity_ * size_per_prey_))},
 				hole_descriptor_{static_cast<size_type*>(heap::allocate(policy_type::get_descriptor_count(capacity_)))},
@@ -108,7 +109,7 @@ namespace gal::gsl::utils
 			[[nodiscard]] constexpr auto inside(const data_type prey) const noexcept -> bool { return prey >= hole_ && prey < hole_ + static_cast<std::ptrdiff_t>(caught_ * size_per_prey_); }
 
 		private:
-			[[nodiscard]] constexpr auto alive(const size_type index, const size_type mask) const noexcept { return hole_descriptor_[index] & mask; }
+			[[nodiscard]] constexpr auto alive(const size_type index, const size_type mask) const noexcept -> bool { return hole_descriptor_[index] & mask; }
 
 		public:
 			/**
@@ -117,7 +118,7 @@ namespace gal::gsl::utils
 			 * \return it is still alive
 			 * \note It is meaningful only when the prey is in the hole, otherwise the program may crash!
 			 */
-			[[nodiscard]] constexpr auto alive(const data_type prey) const noexcept
+			[[nodiscard]] constexpr auto alive(const data_type prey) const noexcept -> bool
 			{
 				const auto [index, offset, mask] = policy_type::get_descriptor_state(hole_, capacity_, size_per_prey_, prey);
 				return alive(index, mask);
@@ -176,6 +177,129 @@ namespace gal::gsl::utils
 			 * \note It is meaningful only when the prey is in the hole, otherwise the program may crash!
 			 */
 			auto mark(data_type prey) -> void;
+		};
+
+		class Trap
+		{
+		public:
+			using data_type = Hole::data_type;
+			using size_type = Hole::size_type;
+
+			constexpr static size_type size_shift = 4;
+			constexpr static size_type hole_size = kHeapSmallAllocationThreshold >> size_shift;
+			constexpr static size_type size_per_hole = kHeapSmallAllocationThreshold / hole_size;
+
+			// todo: adaptive?
+			using policy_type = heap_small_allocation_policy::rebind_policy<std::uint16_t>;
+			static_assert(policy_type::size_type_bit_size == size_per_hole);
+
+			[[nodiscard]] constexpr static auto prey_size_in_hole(const size_type which_hole) noexcept -> size_type { return (which_hole + 1) << size_shift; }
+
+			[[nodiscard]] constexpr static auto which_hole_for_prey(const size_type size_of_prey) noexcept -> size_type { return (size_of_prey >> size_shift) - 1; }
+
+			struct trap_state
+			{
+				size_type total_holes;
+				size_type deepest_hole;
+				size_type total_space_for_preys;
+				size_type total_space_for_holes;
+			};
+
+		private:
+			std::array<Hole*, hole_size> holes_;
+
+		public:
+			Trap() = default;
+
+			Trap(const Trap& other) = delete;
+			Trap(Trap&& other) noexcept = delete;
+			auto operator=(const Trap& other) -> Trap& = delete;
+			auto operator=(Trap&& other) noexcept -> Trap& = delete;
+
+			~Trap() noexcept { destroy(); }
+
+			/**
+			 * \brief destroy the whole trap (deallocate memory)
+			 */
+			auto destroy() -> void { for (auto*& hole: holes_) { heap::delete_object(hole); } }
+
+			/**
+			 * \brief reset all holes (not deallocate memory)
+			 */
+			auto reset() -> void { for (auto*& hole: holes_) { hole->reset(); } }
+
+			/**
+			 * \brief Whether the prey falls into the trap
+			 * \param prey the prey
+			 * \param size_per_prey the size of the prey
+			 * \return if it falls into the trap, returns true; otherwise, returns false
+			 */
+			[[nodiscard]] constexpr auto inside(const data_type prey, const size_type size_per_prey) const noexcept -> bool
+			{
+				const auto which_hole = which_hole_for_prey(size_per_prey);
+				for (const auto* hole = holes_[which_hole]; hole; hole = hole->next()) { if (hole->inside(prey)) { return true; } }
+				return false;
+			}
+
+			/**
+			 * \brief Are the prey in the trap still alive?
+			 * \param prey the prey
+			 * \param size_per_prey the size of the prey
+			 * \return if it falls into the trap and it still alive, returns true; otherwise, returns false
+			 */
+			[[nodiscard]] constexpr auto alive(const data_type prey, const size_type size_per_prey) const noexcept -> bool
+			{
+				const auto which_hole = which_hole_for_prey(size_per_prey);
+				for (const auto* hole = holes_[which_hole]; hole; hole = hole->next()) { if (hole->inside(prey)) { return hole->alive(prey); } }
+				return false;
+			}
+
+			/**
+			 * \brief Get state about current trap
+			 * \return the state about current trap
+			 */
+			[[nodiscard]] constexpr auto state() const noexcept -> trap_state
+			{
+				trap_state ret{};
+				for (const auto* hole: holes_)
+				{
+					size_type current_depth = 0;
+					for (; hole; hole = hole->next())
+					{
+						++current_depth;
+
+						ret.total_holes += 1;
+						ret.total_space_for_preys += hole->space_for_prey();
+						ret.total_space_for_holes += hole->space_for_hole();
+					}
+
+					if (current_depth > ret.deepest_hole) { ret.deepest_hole = current_depth; }
+				}
+				return ret;
+			}
+
+			/**
+			 * \brief Capture a new prey
+			 * \param size_per_prey the prey size
+			 * \return a new prey
+			 */
+			[[nodiscard]] auto catch_new_one(size_type size_per_prey) -> data_type;
+
+			/**
+			 * \brief Digest a prey
+			 * \param prey a prey
+			 * \param size_per_prey the size of the prey
+			 * \note It is meaningful only when the prey is in the trap, otherwise the program may crash!
+			 */
+			auto digest_this_one(data_type prey, size_type size_per_prey) -> void;
+
+			/**
+			 * \brief Mark a prey for counting dead prey
+			 * \param prey a prey
+			 * \param size_per_prey the size of the prey
+			 * \return returns true if the prey is in the trap and successfully marked the prey, otherwise returns false
+			 */
+			auto mark(data_type prey, size_type size_per_prey) -> bool;
 		};
 	}
 }

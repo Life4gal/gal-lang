@@ -88,5 +88,59 @@ namespace gal::gsl::utils
 				++gc_caught_;
 			}
 		}
+
+		auto Trap::catch_new_one(const size_type size_per_prey) -> Trap::data_type
+		{
+			const auto real_size = policy_type::get_fit_aligned_size(size_per_prey);
+			gsl_assert(real_size <= kHeapSmallAllocationThreshold, fmt::format("An allocation of size `{}` cannot be considered a small object allocation.", size_per_prey));
+
+			const auto which_hole = which_hole_for_prey(real_size);
+			for (auto*& hole = holes_[which_hole]; hole; hole = hole->next())
+			{
+				if (auto* data = hole->catch_new_one())
+				{
+					return data;
+				}
+			}
+
+			boost::logger::warn("This trap is full and can't hold any more prey!");
+			return nullptr;
+		}
+
+		auto Trap::digest_this_one(data_type prey, size_type size_per_prey) -> void
+		{
+			const auto real_size = policy_type::get_fit_aligned_size(size_per_prey);
+			gsl_assert(real_size <= kHeapSmallAllocationThreshold, fmt::format("An allocation of size `{}` cannot be considered a small object allocation.", size_per_prey));
+
+			const auto which_hole = which_hole_for_prey(real_size);
+			for (auto*& hole = holes_[which_hole]; hole; hole = hole->next())
+			{
+				if (hole->inside(prey))
+				{
+					hole->digest_this_one(prey);
+				}
+			}
+
+			gsl_trap(fmt::format("Can't digest this prey({}), maybe the size({}) mismatch?", static_cast<void*>(prey), size_per_prey));
+		}
+
+		auto Trap::mark(const data_type prey, size_type size_per_prey) -> bool
+		{
+			const auto real_size = policy_type::get_fit_aligned_size(size_per_prey);
+			gsl_assert(real_size <= kHeapSmallAllocationThreshold, fmt::format("An allocation of size `{}` cannot be considered a small object allocation.", size_per_prey));
+
+			const auto which_hole = which_hole_for_prey(real_size);
+			for (auto*& hole = holes_[which_hole]; hole; hole = hole->next())
+			{
+				if (hole->inside(prey))
+				{
+					hole->mark(prey);
+					return true;
+				}
+			}
+
+			return false;
+		}
+
 	}
 }// namespace gal::gsl::utils
