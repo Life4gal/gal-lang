@@ -27,7 +27,7 @@ namespace gal::gsl::utils
 
 	namespace memory_model_detail
 	{
-		class Hole
+		class Hole final
 		{
 		public:
 			using policy_type = heap_small_allocation_policy;
@@ -192,7 +192,7 @@ namespace gal::gsl::utils
 			auto mark(data_type prey) -> void;
 		};
 
-		class Trap
+		class Trap final
 		{
 		public:
 			using data_type = Hole::data_type;
@@ -328,10 +328,15 @@ namespace gal::gsl::utils
 			 * \return returns true if the prey is in the trap and successfully marked the prey, otherwise returns false
 			 */
 			auto mark(data_type prey, size_type size_per_prey) -> bool;
+
+			/**
+			 * \brief Preparation for prey
+			 */
+			auto before_prey_begin() -> void { for (auto*& hole: holes_) { hole->before_prey_begin(); } }
 		};
 	}
 
-	class MemoryModel
+	class MemoryModel final
 	{
 	public:
 		using policy_type = heap_small_allocation_policy;
@@ -378,6 +383,7 @@ namespace gal::gsl::utils
 		accelerate::unordered_map<void*, size_type> big_stuffs_;
 
 		#ifdef GSL_ALLOCATIONS_TRACK
+	public:
 		struct big_stuff_info
 		{
 			using comment_type = const char*;
@@ -387,6 +393,7 @@ namespace gal::gsl::utils
 			comment_type comment;
 		};
 
+	private:
 		accelerate::unordered_map<void*, big_stuff_info> big_stuff_infos_;
 		#endif
 
@@ -406,20 +413,32 @@ namespace gal::gsl::utils
 		auto operator=(const MemoryModel& other) -> MemoryModel& = delete;
 		auto operator=(MemoryModel&& other) noexcept -> MemoryModel& = delete;
 
-		virtual ~MemoryModel() = 0;
+		~MemoryModel() noexcept;
 
 		/**
 		 * \brief Reset the initial capacity of the hole (only for holes created later)
 		 * \param initial_size the new initial_size
 		 */
-		auto set_initial_size(const size_type initial_size) -> void { initial_size_ = initial_size; }
+		constexpr auto set_initial_size(const size_type initial_size) noexcept -> void { initial_size_ = initial_size; }
+
+		/**
+		 * \brief Get the initial capacity of the hole
+		 * \return the initial capacity of the hole
+		 */
+		[[nodiscard]] constexpr auto get_initial_size() const noexcept -> size_type { return initial_size_; }
+
+		/**
+		 * \brief Set the growth mode of hole capacity
+		 * \param grow_function the growth mode of hole capacity
+		 */
+		auto set_grow_function(grow_function_type&& grow_function) noexcept -> void { grow_function_ = std::forward<decltype(grow_function)>(grow_function); }
 
 		/**
 		 * \brief If we want to grow the capacity of a hole, how much the capacity should be
 		 * \param which_hole which hole we want to grow
 		 * \return the new capacity
 		 */
-		[[nodiscard]] auto hole_size_if_grow(size_type which_hole) const -> size_type;
+		[[nodiscard]] auto hole_size_if_grow(size_type which_hole) const noexcept -> size_type;
 
 		/**
 		 * \brief Determine if data is allocated by us
@@ -486,13 +505,30 @@ namespace gal::gsl::utils
 		auto deallocate(data_type data, size_type size) -> bool;
 
 		/**
+		 * \brief Mark the target data (for GC)
+		 * \param data the data
+		 * \param size the size of the data
+		 */
+		auto mark(data_type data, size_type size) -> void;
+
+		/**
+		 * \brief prepare for GC
+		 */
+		auto prepare_for_gc() -> void { trap_.before_prey_begin(); }
+
+		/**
 		 * \brief clear all data (deallocate memory)
 		 */
-		virtual auto reset() -> void;
+		auto reset() -> void;
 
 		/**
 		 * \brief Record all memory allocations
 		 */
-		virtual auto sweep() -> void;
+		auto sweep() -> void;
+
+		/**
+		 * \brief Dump all information about the model
+		 */
+		auto dump() -> void;
 	};
 }

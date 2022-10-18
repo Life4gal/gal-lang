@@ -35,4 +35,6 @@ namespace gal::gsl::utils
 
 		return ret;
 	}
+
+	AllocatorBase::~AllocatorBase() = default;
 }

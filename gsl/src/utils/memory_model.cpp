@@ -167,7 +167,7 @@ namespace gal::gsl::utils
 		}
 	}
 
-	MemoryModel::~MemoryModel()
+	MemoryModel::~MemoryModel() noexcept
 	{
 		// destroy trap
 		trap_.destroy();
@@ -286,6 +286,22 @@ namespace gal::gsl::utils
 		return false;
 	}
 
+	auto MemoryModel::mark(const data_type data, size_type size) -> void
+	{
+		// big stuff
+		if (const auto it = big_stuffs_.find(data);
+			it != big_stuffs_.end())
+		{
+			it->second |= kHeapGcMask;
+			return;
+		}
+
+		if (size > kHeapSmallAllocationThreshold) { return; }
+
+		// small allocation
+		if (!trap_.mark(data, size)) { boost::logger::warn("Cannot mark data(address: {}, size: {}).", static_cast<void*>(data), size); }
+	}
+
 	auto MemoryModel::reset() -> void
 	{
 		for (auto& [data, size]: big_stuffs_)
@@ -331,5 +347,10 @@ namespace gal::gsl::utils
 				big_stuff_it = big_stuffs_.erase(big_stuff_it);
 			}
 		}
+	}
+
+	auto MemoryModel::dump() -> void
+	{
+		// todo: our logger
 	}
 }// namespace gal::gsl::utils
