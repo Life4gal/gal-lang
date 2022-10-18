@@ -1,7 +1,14 @@
 #pragma once
 
 #include <array>
+#include <functional>
+#include <gsl/accelerate/unordered_map.hpp>
 #include <gsl/config.hpp>
+
+namespace gal::gsl::core
+{
+	class LineInfo;
+}
 
 namespace gal::gsl::utils
 {
@@ -10,7 +17,7 @@ namespace gal::gsl::utils
 	{
 		using id_type = std::uint64_t;
 
-		[[nodiscard]] auto generator_id() noexcept -> id_type;
+		[[nodiscard]] auto generate_id() noexcept -> id_type;
 
 		auto set_breakpoint(id_type id) noexcept -> void;
 
@@ -125,6 +132,12 @@ namespace gal::gsl::utils
 			}
 
 			/**
+			 * \brief Sweep the hole and count the prey alive after prey end
+			 * \return the prey count (* size_per_element)
+			 */
+			[[nodiscard]] auto sweep() -> size_type;
+
+			/**
 			 * \brief Obtain the number of prey currently captured (only the alive ones are included)
 			 * \return the number of prey currently captured
 			 */
@@ -200,7 +213,7 @@ namespace gal::gsl::utils
 			struct trap_state
 			{
 				size_type total_holes;
-				size_type deepest_hole;
+				size_type deepest_depth;
 				size_type total_space_for_preys;
 				size_type total_space_for_holes;
 			};
@@ -255,6 +268,17 @@ namespace gal::gsl::utils
 			}
 
 			/**
+			 * \brief Sweep the holes and count the prey alive after prey end
+			 * \return the prey count (* size_per_element)
+			 */
+			[[nodiscard]] auto sweep() -> size_type
+			{
+				size_type sweep_size = 0;
+				for (auto*& hole: holes_) { for (; hole; hole = hole->next()) { sweep_size += hole->sweep(); } }
+				return sweep_size;
+			}
+
+			/**
 			 * \brief Get state about current trap
 			 * \return the state about current trap
 			 */
@@ -273,10 +297,14 @@ namespace gal::gsl::utils
 						ret.total_space_for_holes += hole->space_for_hole();
 					}
 
-					if (current_depth > ret.deepest_hole) { ret.deepest_hole = current_depth; }
+					if (current_depth > ret.deepest_depth) { ret.deepest_depth = current_depth; }
 				}
 				return ret;
 			}
+
+			[[nodiscard]] auto touch_hole(size_type which_hole) const noexcept -> const Hole*;
+
+			[[nodiscard]] auto dig_hole(size_type which_hole, size_type capacity, size_type size_per_prey, Hole* next) -> Hole*;
 
 			/**
 			 * \brief Capture a new prey
@@ -302,4 +330,169 @@ namespace gal::gsl::utils
 			auto mark(data_type prey, size_type size_per_prey) -> bool;
 		};
 	}
+
+	class MemoryModel
+	{
+	public:
+		using policy_type = heap_small_allocation_policy;
+
+		using data_type = policy_type::data_type;
+		using size_type = policy_type::size_type;
+
+		using grow_function_type = std::function<size_type(size_type)>;
+
+		using trap_type = memory_model_detail::Trap;
+
+		constexpr static size_type default_grow_multiplier = 2;
+		constexpr static size_type default_initial_size = 1 << 16;
+
+	private:
+		/**
+		 * \brief Initial capacity of the hole (divided by the size of the prey)
+		 */
+		size_type initial_size_;
+
+		/**
+		 * \brief The total amount of memory currently used
+		 */
+		size_type total_allocated_;
+
+		/**
+		 * \brief Peak memory usage
+		 */
+		size_type allocate_peak_;
+
+		/**
+		 * \brief Function to replace the default growth method (multiply by default_grow_multiplier)
+		 */
+		grow_function_type grow_function_;
+
+		/**
+		 * \brief The trap for small allocations
+		 */
+		trap_type trap_;
+
+		/**
+		 * \brief The big stuffs
+		 */
+		accelerate::unordered_map<void*, size_type> big_stuffs_;
+
+		#ifdef GSL_ALLOCATIONS_TRACK
+		struct big_stuff_info
+		{
+			using comment_type = const char*;
+
+			tracker::id_type id;
+			core::LineInfo* location;
+			comment_type comment;
+		};
+
+		accelerate::unordered_map<void*, big_stuff_info> big_stuff_infos_;
+		#endif
+
+		#ifdef GSL_ALLOCATIONS_SANITIZER
+		accelerate::unordered_map<void*, size_type> deleted_big_stuffs_;
+		#endif
+
+	public:
+		explicit MemoryModel(const size_type initial_size = default_initial_size)
+			: initial_size_{initial_size},
+			total_allocated_{0},
+			allocate_peak_{0},
+			trap_{} {}
+
+		MemoryModel(const MemoryModel& other) = delete;
+		MemoryModel(MemoryModel&& other) noexcept = delete;
+		auto operator=(const MemoryModel& other) -> MemoryModel& = delete;
+		auto operator=(MemoryModel&& other) noexcept -> MemoryModel& = delete;
+
+		virtual ~MemoryModel() = 0;
+
+		/**
+		 * \brief Reset the initial capacity of the hole (only for holes created later)
+		 * \param initial_size the new initial_size
+		 */
+		auto set_initial_size(const size_type initial_size) -> void { initial_size_ = initial_size; }
+
+		/**
+		 * \brief If we want to grow the capacity of a hole, how much the capacity should be
+		 * \param which_hole which hole we want to grow
+		 * \return the new capacity
+		 */
+		[[nodiscard]] auto hole_size_if_grow(size_type which_hole) const -> size_type;
+
+		/**
+		 * \brief Determine if data is allocated by us
+		 * \param data the data
+		 * \param size_per_element the element size of data
+		 * \return return true if it is, otherwise, return false
+		 */
+		[[nodiscard]] auto inside(const data_type data, const size_type size_per_element) const noexcept -> bool { return trap_.inside(data, size_per_element) || big_stuffs_.contains(data); }
+
+		/**
+		 * \brief Determine if data is allocated by us and it still valid
+		 * \param data the data
+		 * \param size_per_element the element size of data
+		 * \return return true if it is, otherwise, return false
+		 */
+		[[nodiscard]] auto alive(const data_type data, const size_type size_per_element) const noexcept -> bool { return trap_.alive(data, size_per_element) || big_stuffs_.contains(data); }
+
+		/**
+		 * \brief Returns the amount of memory used from `allocate`
+		 * \return the amount of memory used
+		 */
+		[[nodiscard]] constexpr auto used_memory() const noexcept -> size_type { return total_allocated_; }
+
+		/**
+		 * \brief Returns the peak amount of memory used from `allocate`
+		 * \return the peak amount of memory used
+		 */
+		[[nodiscard]] constexpr auto peak_memory() const noexcept -> size_type { return allocate_peak_; }
+
+		/**
+		 * \brief Returns the depth of the deepest hole
+		 * \return the depth of the deepest hole
+		 */
+		[[nodiscard]] auto deepest_depth() const noexcept -> size_type { return trap_.state().deepest_depth; }
+
+		/**
+		 * \brief Returns the sum of memory usage for the entire hole and big stuffs
+		 * \return the sum of memory usage
+		 */
+		[[nodiscard]] auto allocated_memory() const noexcept -> size_type;
+
+		#ifdef GSL_ALLOCATIONS_TRACK
+		/**
+		 * \brief Add some extra information to a big stuff, only meaningful for big stuff
+		 * \param data the big stuff
+		 * \param info extra information
+		 */
+		auto mark(const data_type data, big_stuff_info&& info) -> void { big_stuff_infos_.emplace(data, std::forward<decltype(info)>(info)); }
+		#endif
+
+		/**
+		 * \brief Allocate a block of memory of size `size`
+		 * \param size the size of block
+		 * \return the memory block
+		 */
+		[[nodiscard]] auto allocate(size_type size) -> data_type;
+
+		/**
+		 * \brief Deallocate a block of memory of size `size`
+		 * \param data the memory block
+		 * \param size the size of block
+		 * \return whether the deallocation was successful, this should always return true
+		 */
+		auto deallocate(data_type data, size_type size) -> bool;
+
+		/**
+		 * \brief clear all data (deallocate memory)
+		 */
+		virtual auto reset() -> void;
+
+		/**
+		 * \brief Record all memory allocations
+		 */
+		virtual auto sweep() -> void;
+	};
 }
