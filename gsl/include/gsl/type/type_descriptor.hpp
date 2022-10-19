@@ -22,18 +22,18 @@ namespace gal::gsl::type
 	};
 
 	template<typename TypeDescriptor>
-		requires std::is_convertible_v<TypeDescriptor, type_descriptor>
+		requires(std::derived_from<TypeDescriptor, type_descriptor> && !std::is_same_v<TypeDescriptor, type_descriptor>)
 	[[nodiscard]] constexpr auto type_size(const TypeDescriptor& descriptor) noexcept -> type_descriptor::size_type { return descriptor.type_size(); }
 
 	template<typename TypeDescriptor>
-		requires std::is_convertible_v<TypeDescriptor, type_descriptor>
+		requires(std::derived_from<TypeDescriptor, type_descriptor> && !std::is_same_v<TypeDescriptor, type_descriptor>)
 	constexpr auto zero_out(const TypeDescriptor& descriptor, void* dest, const type_descriptor::size_type count) -> void { return descriptor.zero_out(dest, count); }
 
 	template<typename TypeDescriptor>
-		requires std::is_convertible_v<TypeDescriptor, type_descriptor>
+		requires(std::derived_from<TypeDescriptor, type_descriptor> && !std::is_same_v<TypeDescriptor, type_descriptor>)
 	constexpr auto copy_info(const TypeDescriptor& descriptor, void* dest, const void* source, const type_descriptor::size_type count) -> void { descriptor.copy_info(dest, source, count); }
 
 	template<typename TypeDescriptor>
-		requires std::is_convertible_v<TypeDescriptor, type_descriptor>
+		requires(std::derived_from<TypeDescriptor, type_descriptor> && !std::is_same_v<TypeDescriptor, type_descriptor>)
 	constexpr auto move_into(const TypeDescriptor& descriptor, void* dest, void* source, const type_descriptor::size_type count) -> void { descriptor.move_info(dest, source, count); }
 }
