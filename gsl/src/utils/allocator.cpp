@@ -121,4 +121,24 @@ namespace gal::gsl::utils
 		if (const auto real_size = policy_type::get_fit_aligned_size(static_cast<policy_type::size_type>(string.size() + 1));
 			intern_required_ && inside(const_cast<data_type>(string.data()), real_size)) { intern_list_.insert(string); }
 	}
+
+	auto ConstStringAllocator::construct(value_type string) -> value_type
+	{
+		if (string.empty()) { return {}; }
+
+		if (const auto it = intern_list_.find(string);
+			it != intern_list_.end()) { return *it; }
+
+		const auto ret = pool_.append(string);
+		gsl_verify(intern_list_.insert(ret).second, "Impossible happened!");
+		return ret;
+	}
+
+	auto ConstStringAllocator::intern(const value_type string) -> value_type
+	{
+		if (const auto it = intern_list_.find(string);
+			it != intern_list_.end()) { return *it; }
+
+		return {};
+	}
 }

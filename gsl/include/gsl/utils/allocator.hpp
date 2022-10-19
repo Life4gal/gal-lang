@@ -3,6 +3,7 @@
 #include <gsl/utils/memory_model.hpp>
 #include <gsl/utils/hash.hpp>
 #include <gsl/utils/stack_function.hpp>
+#include <gsl/utils/string_pool.hpp>
 #include <gsl/accelerate/unordered_set.hpp>
 #include <gsl/accelerate/string_view.hpp>
 
@@ -348,5 +349,44 @@ namespace gal::gsl::utils
 		 * \param function how to handle each string
 		 */
 		virtual auto for_each(const StackFunction<void(value_type)>& function) -> void = 0;
+	};
+
+	class ConstStringAllocator final : public accelerate::enable_shared_from_this<ConstStringAllocator>
+	{
+	public:
+		using pool_type = StringPool;
+		using value_type = pool_type::value_type;
+
+		using list_type = StringAllocatorBase::list_type;
+		static_assert(std::is_same_v<list_type::value_type, value_type>);
+
+	private:
+		pool_type pool_;
+		list_type intern_list_;
+
+	public:
+		/**
+		 * \brief Construct a string from the given string
+		 * \param string the given string
+		 * \return the new string
+		 * \note It will search in intern_list (return the string directly if it is found), and add intern_list after construct (if it is not found)
+		 */
+		[[nodiscard]] auto construct(value_type string) -> value_type;
+
+		/**
+		 * \brief Clear all constructed strings (deallocate memory)
+		 */
+		auto clear() noexcept -> void
+		{
+			intern_list_.clear();
+			pool_.clear();
+		}
+
+		/**
+		 * \brief Find the target string from intern_list, if found, return that string, otherwise return an empty string
+		 * \param string the target string
+		 * \return if found, return that string, otherwise return an empty string
+		 */
+		[[nodiscard]] auto intern(value_type string) -> value_type;
 	};
 }
