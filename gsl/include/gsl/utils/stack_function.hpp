@@ -33,7 +33,7 @@ namespace gal::gsl::utils
 		using signature_type = return_type(*)(address_type, Args ...);
 
 		template<typename Functor>
-		[[nodiscard]] constexpr static auto invoker(Functor* target, Args&&... args) -> return_type { return std::invoke(target, std::forward<Args>(args)...); }
+		[[nodiscard]] constexpr static auto invoker(Functor* target, Args&&... args) -> return_type { return std::invoke(*target, std::forward<Args>(args)...); }
 
 	private:
 		address_type target_address_;
