@@ -13,6 +13,15 @@ namespace gal::gsl::utils
 	template<typename Function>
 	class StackFunction;
 
+	template<typename T>
+	struct is_stack_function : std::false_type {};
+
+	template<typename Function>
+	struct is_stack_function<StackFunction<Function>> : std::true_type {};
+
+	template<typename T>
+	constexpr static bool is_stack_function_v = is_stack_function<T>::value;
+
 	template<typename Return, typename... Args>
 	class StackFunction<Return(Args ...)>
 	{
@@ -36,10 +45,10 @@ namespace gal::gsl::utils
 			signature_{nullptr} {}
 
 		template<typename Functor>
-		constexpr explicit StackFunction(const Functor& functor) noexcept
+			requires(!is_stack_function_v<Functor>)
+		constexpr explicit(false) StackFunction(const Functor& functor) noexcept
 			: target_address_{reinterpret_cast<address_type>(&functor)},
 			signature_{reinterpret_cast<signature_type>(invoker<Functor>)} {}
-
 
 		constexpr StackFunction(const StackFunction& other) = delete;
 		constexpr StackFunction(StackFunction&& other) noexcept = delete;
