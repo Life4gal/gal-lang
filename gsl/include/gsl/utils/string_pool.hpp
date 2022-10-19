@@ -75,7 +75,7 @@ namespace gal::gsl::utils
 		pool_type pool_;
 		size_type current_capacity_;
 
-		[[nodiscard]] constexpr auto append_str_into_block(const value_type string, iterator pos) -> value_type
+		[[nodiscard]] auto append_str_into_block(const value_type string, iterator pos) -> value_type
 		{
 			const auto ret = pos->append(string);
 
@@ -152,7 +152,7 @@ namespace gal::gsl::utils
 				...);
 		}
 
-		constexpr auto append(const value_type string) -> value_type { return append_str_into_block(string, find_or_create_block(string)); }
+		auto append(const value_type string) -> value_type { return append_str_into_block(string, find_or_create_block(string)); }
 
 		[[nodiscard]] constexpr auto size() const noexcept -> size_type { return pool_.size(); }
 

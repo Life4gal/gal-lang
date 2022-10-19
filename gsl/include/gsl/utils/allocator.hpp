@@ -25,8 +25,8 @@ namespace gal::gsl::utils
 	class StackAllocator final
 	{
 	public:
-		using data_type = MemoryModel::data_type;
-		using size_type = MemoryModel::size_type;
+		using data_type = heap_data_type;
+		using size_type = heap_data_size_type;
 
 		struct stack_state
 		{
@@ -192,8 +192,8 @@ namespace gal::gsl::utils
 	class AllocatorBase : public accelerate::enable_shared_from_this<AllocatorBase>
 	{
 	public:
-		using data_type = MemoryModel::data_type;
-		using size_type = MemoryModel::size_type;
+		using data_type = heap_data_type;
+		using size_type = heap_data_size_type;
 
 		AllocatorBase() = default;
 
@@ -206,7 +206,7 @@ namespace gal::gsl::utils
 
 		constexpr virtual auto set_initial_size(size_type initial_size) noexcept -> void = 0;
 		[[nodiscard]] constexpr virtual auto get_initial_size() const noexcept -> size_type = 0;
-		virtual auto set_grow_function(MemoryModel::grow_function_type&& grow_function) -> void = 0;
+		virtual auto set_grow_function(memory_model_grow_function_type&& grow_function) -> void = 0;
 		[[nodiscard]] virtual auto inside(data_type data, size_type size) const noexcept -> bool = 0;
 		[[nodiscard]] virtual auto alive(data_type data, size_type size) const noexcept -> bool = 0;
 		[[nodiscard]] virtual auto used_memory() const noexcept -> size_type = 0;
@@ -214,7 +214,11 @@ namespace gal::gsl::utils
 		[[nodiscard]] virtual auto allocated_memory() const noexcept -> size_type = 0;
 		[[nodiscard]] virtual auto deepest_depth() const noexcept -> size_type = 0;
 		#ifdef GSL_ALLOCATIONS_TRACK
-		virtual auto mark(const data_type data, MemoryModel::big_stuff_info&& info) -> void {}
+		virtual auto mark(const data_type data, FreeGrowModel::big_stuff_info&& info) -> void
+		{
+			(void)data;
+			(void)info;
+		}
 		#endif
 
 		[[nodiscard]] virtual auto allocate(size_type size) -> data_type = 0;
@@ -233,14 +237,14 @@ namespace gal::gsl::utils
 		using AllocatorBase::AllocatorBase;
 
 	private:
-		MemoryModel model_;
+		FreeGrowModel model_;
 
 	public:
 		constexpr auto set_initial_size(const size_type initial_size) noexcept -> void override { model_.set_initial_size(initial_size); }
 
 		[[nodiscard]] constexpr auto get_initial_size() const noexcept -> size_type override { return model_.get_initial_size(); }
 
-		auto set_grow_function(MemoryModel::grow_function_type&& grow_function) -> void override { model_.set_grow_function(std::forward<decltype(grow_function)>(grow_function)); }
+		auto set_grow_function(memory_model_grow_function_type&& grow_function) -> void override { model_.set_grow_function(std::forward<decltype(grow_function)>(grow_function)); }
 
 		[[nodiscard]] auto inside(const data_type data, const size_type size) const noexcept -> bool override { return model_.inside(data, size); }
 
@@ -255,7 +259,7 @@ namespace gal::gsl::utils
 		[[nodiscard]] auto deepest_depth() const noexcept -> size_type override { return model_.deepest_depth(); }
 
 		#ifdef GSL_ALLOCATIONS_TRACK
-		auto mark(const data_type data, MemoryModel::big_stuff_info&& info) -> void override { model_.mark(data, std::forward<decltype(info)>(info)); }
+		auto mark(const data_type data, FreeGrowModel::big_stuff_info&& info) -> void override { model_.mark(data, std::forward<decltype(info)>(info)); }
 		#endif
 
 		auto allocate(const size_type size) -> data_type override { return model_.allocate(size); }
@@ -396,14 +400,14 @@ namespace gal::gsl::utils
 		using StringAllocatorBase::StringAllocatorBase;
 
 	private:
-		MemoryModel model_;
+		FreeGrowModel model_;
 
 	public:
 		constexpr auto set_initial_size(const AllocatorBase::size_type initial_size) noexcept -> void override { model_.set_initial_size(initial_size); }
 
 		[[nodiscard]] constexpr auto get_initial_size() const noexcept -> AllocatorBase::size_type override { return model_.get_initial_size(); }
 
-		auto set_grow_function(MemoryModel::grow_function_type&& grow_function) -> void override { model_.set_grow_function(std::forward<decltype(grow_function)>(grow_function)); }
+		auto set_grow_function(memory_model_grow_function_type&& grow_function) -> void override { model_.set_grow_function(std::forward<decltype(grow_function)>(grow_function)); }
 
 		[[nodiscard]] auto inside(const data_type data, const AllocatorBase::size_type size) const noexcept -> bool override { return model_.inside(data, size); }
 
@@ -418,7 +422,7 @@ namespace gal::gsl::utils
 		[[nodiscard]] auto deepest_depth() const noexcept -> AllocatorBase::size_type override { return model_.deepest_depth(); }
 
 		#ifdef GSL_ALLOCATIONS_TRACK
-		auto mark(const data_type data, MemoryModel::big_stuff_info&& info) -> void override { model_.mark(data, std::forward<decltype(info)>(info)); }
+		auto mark(const data_type data, FreeGrowModel::big_stuff_info&& info) -> void override { model_.mark(data, std::forward<decltype(info)>(info)); }
 		#endif
 
 		auto allocate(const AllocatorBase::size_type size) -> data_type override { return model_.allocate(size); }
@@ -439,6 +443,6 @@ namespace gal::gsl::utils
 
 		auto dump() -> void override { model_.dump(); }
 
-		auto for_each(const StackFunction<void(value_type)>& function) -> void override { model_.sweep([&function](MemoryModel::data_type data, MemoryModel::size_type size) { function(value_type{data, size}); }); }
+		auto for_each(const StackFunction<void(value_type)>& function) -> void override { model_.sweep([&function](const FreeGrowModel::data_type data, const FreeGrowModel::size_type size) { function(value_type{data, size}); }); }
 	};
 }
