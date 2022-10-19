@@ -293,7 +293,7 @@ namespace gal::gsl::utils
 		using pointer = value_type::pointer;
 		using size_type = value_type::size_type;
 
-	private:
+	protected:
 		list_type intern_list_;
 		bool intern_required_{false};
 
@@ -342,7 +342,7 @@ namespace gal::gsl::utils
 		 */
 		auto recognize(value_type string) -> void;
 
-		auto reset() noexcept -> void override { intern_list_.clear(); }
+		auto reset() -> void override { intern_list_.clear(); }
 
 		/**
 		 * \brief Traverse all strings
@@ -388,5 +388,57 @@ namespace gal::gsl::utils
 		 * \return if found, return that string, otherwise return an empty string
 		 */
 		[[nodiscard]] auto intern(value_type string) -> value_type;
+	};
+
+	class PersistentStringAllocator final : public StringAllocatorBase
+	{
+	public:
+		using StringAllocatorBase::StringAllocatorBase;
+
+	private:
+		MemoryModel model_;
+
+	public:
+		constexpr auto set_initial_size(const AllocatorBase::size_type initial_size) noexcept -> void override { model_.set_initial_size(initial_size); }
+
+		[[nodiscard]] constexpr auto get_initial_size() const noexcept -> AllocatorBase::size_type override { return model_.get_initial_size(); }
+
+		auto set_grow_function(MemoryModel::grow_function_type&& grow_function) -> void override { model_.set_grow_function(std::forward<decltype(grow_function)>(grow_function)); }
+
+		[[nodiscard]] auto inside(const data_type data, const AllocatorBase::size_type size) const noexcept -> bool override { return model_.inside(data, size); }
+
+		[[nodiscard]] auto alive(const data_type data, const AllocatorBase::size_type size) const noexcept -> bool override { return model_.alive(data, size); }
+
+		[[nodiscard]] auto used_memory() const noexcept -> AllocatorBase::size_type override { return model_.used_memory(); }
+
+		[[nodiscard]] auto peak_memory() const noexcept -> AllocatorBase::size_type override { return model_.peak_memory(); }
+
+		[[nodiscard]] auto allocated_memory() const noexcept -> AllocatorBase::size_type override { return model_.allocated_memory(); }
+
+		[[nodiscard]] auto deepest_depth() const noexcept -> AllocatorBase::size_type override { return model_.deepest_depth(); }
+
+		#ifdef GSL_ALLOCATIONS_TRACK
+		auto mark(const data_type data, MemoryModel::big_stuff_info&& info) -> void override { model_.mark(data, std::forward<decltype(info)>(info)); }
+		#endif
+
+		auto allocate(const AllocatorBase::size_type size) -> data_type override { return model_.allocate(size); }
+
+		auto deallocate(const data_type data, const AllocatorBase::size_type size) -> void override { model_.deallocate(data, size); }
+
+		auto mark(const data_type data, const AllocatorBase::size_type size) -> void override { model_.mark(data, size); }
+
+		auto prepare_for_gc() -> bool override
+		{
+			model_.prepare_for_gc();
+			return true;
+		}
+
+		auto reset() -> void override { model_.reset(); }
+
+		auto sweep() -> void override;
+
+		auto dump() -> void override { model_.dump(); }
+
+		auto for_each(const StackFunction<void(value_type)>& function) -> void override { model_.sweep([&function](MemoryModel::data_type data, MemoryModel::size_type size) { function(value_type{data, size}); }); }
 	};
 }

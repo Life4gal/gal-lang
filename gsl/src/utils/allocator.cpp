@@ -141,4 +141,15 @@ namespace gal::gsl::utils
 
 		return {};
 	}
+
+	auto PersistentStringAllocator::sweep() -> void
+	{
+		model_.sweep();
+		if (intern_required_)
+		{
+			StringAllocatorBase::reset();
+
+			for_each([&](const value_type string) { gsl_verify(intern_list_.insert(string).second); });
+		}
+	}
 }

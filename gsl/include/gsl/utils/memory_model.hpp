@@ -4,6 +4,7 @@
 #include <functional>
 #include <gsl/accelerate/unordered_map.hpp>
 #include <gsl/config.hpp>
+#include <gsl/utils/stack_function.hpp>
 
 namespace gal::gsl::core
 {
@@ -136,6 +137,13 @@ namespace gal::gsl::utils
 			 * \return the prey count (* size_per_element)
 			 */
 			[[nodiscard]] auto sweep() -> size_type;
+
+			/**
+			 * \brief Sweep the hole and call function on all alive prey
+			 * \param function the function to call
+			 * \todo better name
+			 */
+			auto sweep(const StackFunction<void(data_type, size_type)>& function) -> void;
 
 			/**
 			 * \brief Obtain the number of prey currently captured (only the alive ones are included)
@@ -277,6 +285,13 @@ namespace gal::gsl::utils
 				for (auto*& hole: holes_) { for (; hole; hole = hole->next()) { sweep_size += hole->sweep(); } }
 				return sweep_size;
 			}
+
+			/**
+			 * \brief Sweep the trap and call function on all alive prey
+			 * \param function the function to call
+			 * \todo better name
+			 */
+			auto sweep(const StackFunction<void(data_type, size_type)>& function) -> void { for (auto*& hole: holes_) { for (; hole; hole = hole->next()) { hole->sweep(function); } } }
 
 			/**
 			 * \brief Get state about current trap
@@ -530,5 +545,19 @@ namespace gal::gsl::utils
 		 * \brief Dump all information about the model
 		 */
 		auto dump() -> void;
+
+		/**
+		 * \brief Call function on all alive prey of trap and bif stuff
+		 * \param function the function to call
+		 * \todo better name
+		 */
+		auto sweep(const StackFunction<void(data_type, size_type)>& function) -> void
+		{
+			// small allocation
+			trap_.sweep(function);
+
+			// big stuff
+			for (auto& [data, size]: big_stuffs_) { function(static_cast<data_type>(data), static_cast<size_type>(size)); }
+		}
 	};
 }

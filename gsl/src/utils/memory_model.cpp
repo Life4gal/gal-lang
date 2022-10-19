@@ -51,6 +51,19 @@ namespace gal::gsl::utils
 			return sweep_size;
 		}
 
+		auto Hole::sweep(const StackFunction<void(data_type, size_type)>& function) -> void
+		{
+			const size_type last_index = capacity_ / policy_type::size_type_bit_size;
+			for (size_type i = 0; i < last_index; ++i)
+			{
+				for (size_type offset = 0; offset < policy_type::size_type_bit_size; ++offset)
+				{
+					if (const auto mask = size_type{1} << offset;
+						alive(i, mask)) { function(hole_ + static_cast<std::ptrdiff_t>((i * policy_type::size_type_bit_size + offset) * size_per_prey_), static_cast<size_type>(size_per_prey_)); }
+				}
+			}
+		}
+
 		auto Hole::catch_new_one() -> data_type
 		{
 			if (caught_ == capacity_)
