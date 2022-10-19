@@ -1,8 +1,8 @@
 #pragma once
 
 #include <cstdint>
-#include <memory>
 #include <type_traits>
+#include <gsl/accelerate/memory.hpp>
 
 namespace gal::gsl
 {
