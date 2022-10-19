@@ -180,7 +180,66 @@ namespace gal::gsl::utils
 		}
 	}
 
-	MemoryModel::~MemoryModel() noexcept
+	FixedChunkModel::fixed_chunk::fixed_chunk(const size_type capacity, fixed_chunk* next)
+		: size{0},
+		capacity{policy_type::get_fit_aligned_size(capacity)},
+		data{static_cast<data_type>(heap::allocate(capacity))},
+		next{next} {}
+
+	FixedChunkModel::fixed_chunk::~fixed_chunk() noexcept
+	{
+		heap::deallocate(data);
+
+		while (next)
+		{
+			auto* to_delete = next;
+			next = next->next;
+			to_delete->next = nullptr;
+			heap::delete_object(to_delete);
+		}
+	}
+
+	auto FixedChunkModel::fixed_chunk::allocate(const size_type this_size) -> data_type
+	{
+		if (this_size + size > capacity) { return nullptr; }
+
+		auto* dest = data + size;
+		size += this_size;
+		return dest;
+	}
+
+	auto FixedChunkModel::fixed_chunk::deallocate(const data_type this_data, const size_type this_size) -> void { if (this_data + this_size == data + size) { size -= this_size; } }
+
+	auto FixedChunkModel::do_allocate(const size_type size) -> data_type
+	{
+		if (size == 0) { return nullptr; }
+
+		const auto real_size = policy_type::get_fit_aligned_size(size);
+		if (!chunk_) { chunk_ = heap::new_object<fixed_chunk>(std::ranges::max(initial_size_, real_size), nullptr); }
+
+		for (;;)
+		{
+			if (auto* data = chunk_->allocate(size)) { return data; }
+			chunk_ = heap::new_object<fixed_chunk>(std::ranges::max(do_hole_size_if_grow(chunk_->capacity), real_size), chunk_);
+		}
+	}
+
+	auto FixedChunkModel::do_deallocate(const data_type data, const size_type size) -> bool
+	{
+		const auto real_size = policy_type::get_fit_aligned_size(size);
+
+		for (auto*& c = chunk_; c; c = c->next)
+		{
+			if (c->inside(data))
+			{
+				c->deallocate(data, real_size);
+				break;
+			}
+		}
+		return true;
+	}
+
+	FreeGrowModel::~FreeGrowModel() noexcept
 	{
 		// destroy trap
 		trap_.destroy();
@@ -196,7 +255,7 @@ namespace gal::gsl::utils
 		#endif
 	}
 
-	auto MemoryModel::hole_size_if_grow(const size_type which_hole) const -> size_type
+	auto FreeGrowModel::do_hole_size_if_grow(const size_type which_hole) const noexcept -> size_type
 	{
 		if (const auto* hole = trap_.touch_hole(which_hole))
 		{
@@ -210,14 +269,14 @@ namespace gal::gsl::utils
 		return initial_size_ / trap_type::prey_size_in_hole(which_hole);
 	}
 
-	auto MemoryModel::allocated_memory() const noexcept -> size_type
+	auto FreeGrowModel::do_allocated_memory() const noexcept -> size_type
 	{
 		auto allocated = trap_.state().total_space_for_holes;
 		for (const auto size: big_stuffs_ | std::views::values) { allocated += size; }
 		return allocated;
 	}
 
-	auto MemoryModel::allocate(const size_type size) -> data_type
+	auto FreeGrowModel::do_allocate(const size_type size) -> data_type
 	{
 		if (size == 0) { return nullptr; }
 
@@ -245,13 +304,13 @@ namespace gal::gsl::utils
 		if (auto* data = trap_.catch_new_one(real_size)) { return data; }
 
 		// allocate failed, make new hole
-		const auto index = memory_model_detail::Trap::which_hole_for_prey(real_size);
+		const auto index		  = memory_model_detail::Trap::which_hole_for_prey(real_size);
 		const auto elements_count = hole_size_if_grow(index);
 		return trap_.dig_hole(index, elements_count, real_size, const_cast<memory_model_detail::Hole*>(trap_.touch_hole(index)))->catch_new_one();
 		#endif
 	}
 
-	auto MemoryModel::deallocate(data_type data, const size_type size) -> bool
+	auto FreeGrowModel::do_deallocate(data_type data, const size_type size) -> bool
 	{
 		if (size == 0) { return true; }
 
@@ -299,7 +358,7 @@ namespace gal::gsl::utils
 		return false;
 	}
 
-	auto MemoryModel::mark(const data_type data, size_type size) -> void
+	auto FreeGrowModel::mark(const data_type data, size_type size) -> void
 	{
 		// big stuff
 		if (const auto it = big_stuffs_.find(data);
@@ -315,7 +374,7 @@ namespace gal::gsl::utils
 		if (!trap_.mark(data, size)) { boost::logger::warn("Cannot mark data(address: {}, size: {}).", static_cast<void*>(data), size); }
 	}
 
-	auto MemoryModel::reset() -> void
+	auto FreeGrowModel::reset() -> void
 	{
 		for (auto& [data, size]: big_stuffs_)
 		{
@@ -334,7 +393,7 @@ namespace gal::gsl::utils
 		trap_.destroy();
 	}
 
-	auto MemoryModel::sweep() -> void
+	auto FreeGrowModel::sweep() -> void
 	{
 		#ifndef GSL_ALLOCATIONS_TRACK
 		total_allocated_ = trap_.sweep();
@@ -362,7 +421,7 @@ namespace gal::gsl::utils
 		}
 	}
 
-	auto MemoryModel::dump() -> void
+	auto FreeGrowModel::dump() -> void
 	{
 		// todo: our logger
 	}
