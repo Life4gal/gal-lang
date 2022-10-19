@@ -13,7 +13,7 @@ namespace gal::gsl::core
 namespace gal::gsl::utils
 {
 	#ifdef GSL_ALLOCATIONS_TRACK
-	namespace tracker
+	namespace memory_model_tracker
 	{
 		using id_type = std::uint64_t;
 
@@ -21,7 +21,7 @@ namespace gal::gsl::utils
 
 		auto set_breakpoint(id_type id) noexcept -> void;
 
-		[[nodiscard]] auto require_freeze() noexcept -> bool;
+		auto freeze_if_required() noexcept -> void;
 	}
 	#endif
 
@@ -388,7 +388,7 @@ namespace gal::gsl::utils
 		{
 			using comment_type = const char*;
 
-			tracker::id_type id;
+			memory_model_tracker::id_type id;
 			core::LineInfo* location;
 			comment_type comment;
 		};

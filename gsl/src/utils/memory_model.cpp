@@ -9,7 +9,7 @@
 namespace
 {
 	#ifdef GSL_ALLOCATIONS_TRACK
-	using id_type = gal::gsl::utils::tracker::id_type;
+	using id_type = gal::gsl::utils::memory_model_tracker::id_type;
 
 	id_type g_tracker = 0;
 	id_type g_breakpoint = static_cast<id_type>(-1);
@@ -19,14 +19,14 @@ namespace
 namespace gal::gsl::utils
 {
 	#ifdef GSL_ALLOCATIONS_TRACK
-	namespace tracker
+	namespace memory_model_tracker
 	{
 		[[nodiscard]] auto generate_id() noexcept -> id_type { return g_tracker++; }
 
 		auto set_breakpoint(const id_type id) noexcept -> void { g_breakpoint = id; }
 
-		[[nodiscard]] auto require_freeze() noexcept -> bool { return g_tracker == g_breakpoint; }
-	}// namespace tracker
+		auto freeze_if_required() noexcept -> void { if (g_tracker == g_breakpoint) { debug::freeze_here(); } }
+	}// namespace memory_model_tracker
 	#endif
 
 	namespace memory_model_detail
@@ -221,8 +221,8 @@ namespace gal::gsl::utils
 			auto* data = static_cast<data_type>(heap::allocate(real_size));
 			big_stuffs_[data] = real_size;
 			#ifdef GSL_ALLOCATIONS_TRACK
-			if (tracker::require_freeze()) { debug::freeze_here(); }
-			big_stuff_infos_[data].id = tracker::generate_id();
+			memory_model_tracker::freeze_if_required();
+			big_stuff_infos_[data].id = memory_model_tracker::generate_id();
 			#endif
 			return data;
 		}
