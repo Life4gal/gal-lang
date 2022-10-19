@@ -69,7 +69,7 @@ namespace gal::gsl
 
 	using heap_small_allocation_policy = HeapSmallAllocationPolicy<std::uint32_t>;
 	constexpr heap_data_size_type kHeapSmallAllocationThreshold = 1 << 8;
-	constexpr heap_data_size_type kHeapGcMask = std::numeric_limits<std::make_signed_t<heap_data_size_type>>::max() + 1;
+	constexpr heap_data_size_type kHeapGcMask = static_cast<heap_data_size_type>(std::numeric_limits<std::make_signed_t<heap_data_size_type>>::max()) + 1;
 
 	#define GSL_ALLOCATIONS_TRACK
 	#define GSL_ALLOCATIONS_SANITIZER

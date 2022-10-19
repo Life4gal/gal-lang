@@ -22,8 +22,9 @@ namespace gal::gsl::type
 		return table_.size();
 	}
 
-	auto TableIterator::next(core::ModuleContext& context, data_type output) -> bool
+	auto TableIterator::next(core::ModuleContext& context, const data_type output) -> bool
 	{
+		(void)context;
 		const auto data = this->data();
 		const auto index = next_valid_index((begin_ - data) / type_size_ + 1);
 		begin_ = data + index * type_size_;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <gsl/boost/allocator.hpp>
 
 namespace gal::gsl::accelerate
 {
