@@ -7,10 +7,11 @@
 namespace gal::gsl::core
 {
 	template<typename T>
-	struct ValueCaster;
+	class ValueCaster;
 
-	struct Value
+	class Value
 	{
+	public:
 		union alignas(alignof(std::max_align_t))
 		{
 			char bits[16];
@@ -32,10 +33,88 @@ namespace gal::gsl::core
 	static_assert(sizeof(Value) == sizeof(std::uint32_t) * 4);
 	static_assert(sizeof(Value) == sizeof(float) * 4);
 
-	template<typename T>
-	struct ValueCaster : std::false_type
+	enum class value_caster_policy
 	{
+		UNDEFINED,
+		IMPLICIT,
+		SPECIFIED
+	};
+
+	struct value_caster_undefined
+	{
+		constexpr static value_caster_policy value = value_caster_policy::UNDEFINED;
+	};
+
+	struct value_caster_implicit
+	{
+		constexpr static value_caster_policy value = value_caster_policy::IMPLICIT;
+	};
+
+	struct value_caster_specified
+	{
+		constexpr static value_caster_policy value = value_caster_policy::SPECIFIED;
+	};
+
+	template<typename T>
+	class ValueCaster : public value_caster_undefined
+	{
+	public:
 		constexpr static auto from(const T&) -> Value = delete;
 		constexpr static auto to(const Value&) -> decltype(auto) = delete;
+	};
+
+	template<typename T>
+	class ValueCaster<const T> : public ValueCaster<T> {};
+
+	template<typename T>
+	class ValueCaster<T*> : public value_caster_implicit
+	{
+	public:
+		constexpr static auto from(const T* data) -> Value { return Value{.raw_observer = data}; }
+
+		constexpr static auto to(const Value& data) -> decltype(auto)
+		{
+			// not checked
+			return static_cast<T*>(data.raw_observer);
+		}
+	};
+
+	template<typename T>
+	class ValueCaster<const T*> : public value_caster_implicit
+	{
+	public:
+		constexpr static auto from(const T* data) -> Value { return Value{.raw_observer = data}; }
+
+		constexpr static auto to(const Value& data) -> decltype(auto)
+		{
+			// not checked
+			return static_cast<const T*>(data.raw_observer);
+		}
+	};
+
+	template<typename T>
+	class ValueCaster<T&> : public value_caster_implicit
+	{
+	public:
+		constexpr static auto from(const T& data) -> Value { return Value{.raw_observer = &data}; }
+
+		constexpr static auto to(const Value& data) -> decltype(auto)
+		{
+			// not checked
+			return *static_cast<T*>(data.raw_observer);
+		}
+	};
+
+	template<typename T>
+	class ValueCaster<const T&> : public value_caster_implicit
+	{
+	public:
+		constexpr static auto from(const T& data) -> Value { return Value{.raw_observer = &data}; }
+
+		constexpr static auto to(const Value& data) -> decltype(auto)
+		{
+			// not checked
+			return *static_cast<const T*>(data.raw_observer);
+		}
 	};
 }

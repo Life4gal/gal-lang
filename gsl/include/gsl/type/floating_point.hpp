@@ -80,16 +80,18 @@ namespace gal::gsl
 	namespace core
 	{
 		template<>
-		struct ValueCaster<type::single_precision>
+		class ValueCaster<type::single_precision> : public value_caster_specified
 		{
+		public:
 			constexpr static auto from(const type::single_precision data) noexcept -> Value { return {.single_precision = {data, 0, 0, 0}}; }
 
 			constexpr static auto to(const Value& data) noexcept -> type::single_precision { return data.single_precision[0]; }
 		};
 
 		template<>
-		struct ValueCaster<type::double_precision>
+		class ValueCaster<type::double_precision> : public value_caster_specified
 		{
+		public:
 			constexpr static auto from(const type::double_precision data) noexcept -> Value { return {.double_precision = {data, 0}}; }
 
 			constexpr static auto to(const Value& data) noexcept -> type::double_precision { return data.double_precision[0]; }

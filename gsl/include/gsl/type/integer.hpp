@@ -151,32 +151,36 @@ namespace gal::gsl
 	namespace core
 	{
 		template<>
-		struct ValueCaster<type::signed_integer>
+		class ValueCaster<type::signed_integer> : public value_caster_specified
 		{
+		public:
 			constexpr static auto from(const type::signed_integer data) noexcept -> Value { return {.signed_integer_32 = {data, 0, 0, 0}}; }
 
 			constexpr static auto to(const Value& data) noexcept -> type::signed_integer { return data.signed_integer_32[0]; }
 		};
 
 		template<>
-		struct ValueCaster<type::unsigned_integer>
+		class ValueCaster<type::unsigned_integer> : public value_caster_specified
 		{
+		public:
 			constexpr static auto from(const type::unsigned_integer data) noexcept -> Value { return {.unsigned_integer_32 = {data, 0, 0, 0}}; }
 
 			constexpr static auto to(const Value& data) noexcept -> type::unsigned_integer { return data.unsigned_integer_32[0]; }
 		};
 
 		template<>
-		struct ValueCaster<type::signed_long_integer>
+		class ValueCaster<type::signed_long_integer> : public value_caster_specified
 		{
+		public:
 			constexpr static auto from(const type::signed_long_integer data) noexcept -> Value { return {.signed_integer_64 = {data, 0}}; }
 
 			constexpr static auto to(const Value& data) noexcept -> type::signed_long_integer { return data.signed_integer_64[0]; }
 		};
 
 		template<>
-		struct ValueCaster<type::unsigned_long_integer>
+		class ValueCaster<type::unsigned_long_integer> : public value_caster_specified
 		{
+		public:
 			constexpr static auto from(const type::unsigned_long_integer data) noexcept -> Value { return {.unsigned_integer_64 = {data, 0}}; }
 
 			constexpr static auto to(const Value& data) noexcept -> type::unsigned_long_integer { return data.unsigned_integer_64[0]; }

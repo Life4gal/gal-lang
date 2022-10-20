@@ -80,8 +80,9 @@ namespace gal::gsl
 	namespace core
 	{
 		template<>
-		struct ValueCaster<type::vec4f>
+		class ValueCaster<type::vec4f> : public value_caster_specified
 		{
+		public:
 			constexpr static auto from(const type::vec4f& data) -> Value { return std::bit_cast<Value>(data); }
 
 			/*constexpr*/
@@ -89,8 +90,9 @@ namespace gal::gsl
 		};
 
 		template<>
-		struct ValueCaster<type::vec4i>
+		class ValueCaster<type::vec4i> : public value_caster_specified
 		{
+		public:
 			constexpr static auto from(const type::vec4i& data) -> Value { return std::bit_cast<Value>(data); }
 
 			/*constexpr*/
@@ -98,8 +100,9 @@ namespace gal::gsl
 		};
 
 		template<>
-		struct ValueCaster<type::vec4u>
+		class ValueCaster<type::vec4u> : public value_caster_specified
 		{
+		public:
 			constexpr static auto from(const type::vec4u& data) -> Value { return std::bit_cast<Value>(data); }
 
 			/*constexpr*/

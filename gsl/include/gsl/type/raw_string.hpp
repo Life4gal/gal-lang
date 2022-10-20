@@ -46,8 +46,9 @@ namespace gal::gsl
 	namespace core
 	{
 		template<>
-		struct ValueCaster<type::raw_string>
+		class ValueCaster<type::raw_string> : public value_caster_specified
 		{
+		public:
 			constexpr static auto from(const type::raw_string data) noexcept -> Value { return {.raw_observer = data}; }
 
 			constexpr static auto to(const Value& data) noexcept -> type::raw_string { return static_cast<const char*>(data.raw_observer); }

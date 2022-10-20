@@ -44,8 +44,9 @@ namespace gal::gsl
 	namespace core
 	{
 		template<>
-		struct ValueCaster<type::boolean>
+		class ValueCaster<type::boolean> : public value_caster_specified
 		{
+		public:
 			constexpr static auto from(const type::boolean data) noexcept -> Value { return {.signed_integer_32 = {data, 0, 0, 0}}; }
 
 			constexpr static auto to(const Value& data) noexcept -> type::boolean { return data.signed_integer_32[0]; }

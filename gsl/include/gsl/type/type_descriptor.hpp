@@ -8,6 +8,7 @@ namespace gal::gsl::type
 	struct type_descriptor
 	{
 		using size_type = std::size_t;
+		// config -> heap_data_type
 		using raw_memory_type = char*;
 
 		[[nodiscard]] constexpr auto type_size(this const auto& self) noexcept -> size_type { return self.type_size_impl(); }

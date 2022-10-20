@@ -1,5 +1,8 @@
 #include <gsl/type/vector.hpp>
 
+#include <span>
+#include <gsl/utils/assert.hpp>
+
 namespace gal::gsl::type
 {
 	auto Vector::lock(core::ModuleContext& context) const -> void
@@ -82,5 +85,49 @@ namespace gal::gsl::type
 
 		size_ = 0;
 		return false;
+	}
+
+	auto vector_descriptor::zero_out_impl(void* dest, const size_type count) noexcept -> void
+	{
+		std::ranges::for_each(
+				static_cast<Vector*>(dest),
+				static_cast<Vector*>(dest) + count,
+				[](Vector& d) { d = {}; });
+	}
+
+	auto vector_descriptor::copy_into_impl(void* dest, const void* source, size_type count) -> void
+	{
+		const auto vector_source = std::span{static_cast<const Vector*>(source), count};
+		std::ranges::for_each(
+				vector_source,
+				[dest = static_cast<Vector*>(dest)](const auto& s) mutable
+				{
+					dest->size_ = s.size_;
+					dest->capacity_ = s.capacity_;
+					// todo: how about lock?
+					// dest->lock_ = s.lock_;
+					// todo: how about non-trivial type?
+					gsl_assert(dest->data_ != nullptr, "dest vector should allocate memory before copy!");
+					std::ranges::copy(s.data_, s.data_ + s.size_, dest->data_);
+					// next one
+					++dest;
+				});
+	}
+
+	auto vector_descriptor::move_into_impl(void* dest, void* source, size_type count) -> void
+	{
+		auto vector_source = std::span{static_cast<Vector*>(source), count};
+		std::ranges::for_each(
+				vector_source,
+				[dest = static_cast<Vector*>(dest)](auto& s) mutable
+				{
+					dest->size_ = std::exchange(s.size_, 0);
+					dest->capacity_ = std::exchange(s.capacity_, 0);
+					// todo: how about lock?
+					// dest->lock_		= std::exchange(s.lock_, 0);
+					dest->data_ = std::exchange(s.data_, nullptr);
+					// next one
+					++dest;
+				});
 	}
 }

@@ -1,9 +1,7 @@
 #pragma once
 
-#include <span>
 #include <gsl/core/value.hpp>
 #include <gsl/type/type_descriptor.hpp>
-#include <gsl/utils/assert.hpp>
 
 namespace gal::gsl
 {
@@ -68,49 +66,11 @@ namespace gal::gsl
 		private:
 			[[nodiscard]] constexpr static auto type_size_impl() noexcept -> size_type { return sizeof(Vector); }
 
-			constexpr static auto zero_out_impl(void* dest, const size_type count) noexcept -> void
-			{
-				std::ranges::for_each(
-						static_cast<Vector*>(dest),
-						static_cast<Vector*>(dest) + count,
-						[](Vector& d) { d = {}; });
-			}
+			static auto zero_out_impl(void* dest, size_type count) noexcept -> void;
 
-			constexpr static auto copy_into_impl(void* dest, const void* source, const size_type count) -> void
-			{
-				const auto vector_source = std::span{static_cast<const Vector*>(source), count};
-				std::ranges::for_each(
-						vector_source,
-						[dest = static_cast<Vector*>(dest)](const auto& s) mutable
-						{
-							dest->size_ = s.size_;
-							dest->capacity_ = s.capacity_;
-							// todo: how about lock?
-							// dest->lock_ = s.lock_;
-							// todo: how about non-trivial type?
-							gsl_assert(dest->data_ != nullptr, "dest vector should allocate memory before copy!");
-							std::ranges::copy(s.data_, s.data_ + s.size_, dest->data_);
-							// next one
-							++dest;
-						});
-			}
+			static auto copy_into_impl(void* dest, const void* source, size_type count) -> void;
 
-			constexpr static auto move_into_impl(void* dest, void* source, const size_type count) -> void
-			{
-				auto vector_source = std::span{static_cast<Vector*>(source), count};
-				std::ranges::for_each(
-						vector_source,
-						[dest = static_cast<Vector*>(dest)](auto& s) mutable
-						{
-							dest->size_ = std::exchange(s.size_, 0);
-							dest->capacity_ = std::exchange(s.capacity_, 0);
-							// todo: how about lock?
-							// dest->lock_		= std::exchange(s.lock_, 0);
-							dest->data_ = std::exchange(s.data_, nullptr);
-							// next one
-							++dest;
-						});
-			}
+			static auto move_into_impl(void* dest, void* source, size_type count) -> void;
 		};
 	}
 
@@ -118,9 +78,10 @@ namespace gal::gsl
 	{
 		// todo
 		template<>
-		struct ValueCaster<type::Vector>
+		class ValueCaster<type::Vector> : public value_caster_undefined
 		{
-			constexpr static auto from(const type::Vector data) noexcept -> Value = delete;
+		public:
+			constexpr static auto from(const type::Vector& data) noexcept -> Value = delete;
 
 			constexpr static auto to(const Value& data) noexcept -> type::Vector = delete;
 		};
