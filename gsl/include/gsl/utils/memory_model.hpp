@@ -429,116 +429,9 @@ namespace gal::gsl::utils
 	}
 
 	using memory_model_grow_function_type = std::function<heap_data_size_type(heap_data_size_type)>;
-
-	template<typename Derived>
-	class IMemoryModel
+	
+	class FixedChunkModel final
 	{
-	private:
-		using data_type = heap_data_type;
-		using size_type = heap_data_size_type;
-
-	public:
-		/**
-		 * \brief Reset the initial capacity of the hole (only for holes created later)
-		 * \param initial_size the new initial_size
-		 */
-		// ReSharper disable once CppMemberFunctionMayBeStatic
-		constexpr auto set_initial_size(this auto& self, const size_type initial_size) noexcept -> void { self.do_set_initial_size(initial_size); }
-
-		/**
-		 * \brief Get the initial capacity of the hole
-		 * \return the initial capacity of the hole
-		 */
-		// ReSharper disable once CppMemberFunctionMayBeStatic
-		[[nodiscard]] constexpr auto get_initial_size(this const auto& self) noexcept -> size_type { return self.do_get_initial_size(); }
-
-		/**
-		 * \brief Set the growth mode of hole capacity
-		 * \param grow_function the growth mode of hole capacity
-		 */
-		// ReSharper disable once CppMemberFunctionMayBeStatic
-		auto set_grow_function(this auto& self, memory_model_grow_function_type&& grow_function) noexcept -> void { self.do_set_grow_function(std::forward<decltype(grow_function)>(grow_function)); }
-
-		/**
-		 * \brief If we want to grow the capacity of a hole, how much the capacity should be
-		 * \param which_hole which hole we want to grow
-		 * \return the new capacity
-		 */
-		// ReSharper disable once CppMemberFunctionMayBeStatic
-		[[nodiscard]] auto hole_size_if_grow(this const auto& self, size_type which_hole) noexcept -> size_type { return self.do_hole_size_if_grow(which_hole); }
-
-		/**
-		 * \brief Determine if data is allocated by us
-		 * \param data the data
-		 * \param size_per_element the element size of data
-		 * \return return true if it is, otherwise, return false
-		 */
-		// ReSharper disable once CppMemberFunctionMayBeStatic
-		[[nodiscard]] auto inside(this const auto& self, const data_type data, const size_type size_per_element) noexcept -> bool { return self.do_inside(data, size_per_element); }
-
-		/**
-		 * \brief Determine if data is allocated by us and it still valid
-		 * \param data the data
-		 * \param size_per_element the element size of data
-		 * \return return true if it is, otherwise, return false
-		 */
-		// ReSharper disable once CppMemberFunctionMayBeStatic
-		[[nodiscard]] auto alive(this const auto& self, const data_type data, const size_type size_per_element) noexcept -> bool { return self.do_alive(data, size_per_element); }
-
-		/**
-		 * \brief Returns the amount of memory used from `allocate`
-		 * \return the amount of memory used
-		 */
-		[[nodiscard]] constexpr auto used_memory(this const auto& self) noexcept -> size_type { return self.used_memory(); }
-
-		/**
-		 * \brief Returns the peak amount of memory used from `allocate`
-		 * \return the peak amount of memory used
-		 */
-		[[nodiscard]] constexpr auto peak_memory(this const auto& self) noexcept -> size_type { return self.peak_memory(); }
-
-		/**
-		 * \brief Returns the depth of the deepest hole
-		 * \return the depth of the deepest hole
-		 */
-		[[nodiscard]] auto deepest_depth(this const auto& self) noexcept -> size_type { return self.deepest_depth(); }
-
-		/**
-		 * \brief Returns the sum of memory usage for the entire hole and big stuffs
-		 * \return the sum of memory usage
-		 */
-		[[nodiscard]] auto allocated_memory(this const auto& self) noexcept -> size_type { return self.allocated_memory(); }
-
-		/**
-		 * \brief Allocate a block of memory of size `size`
-		 * \param size the size of block
-		 * \return the memory block
-		 */
-		[[nodiscard]] auto allocate(this auto& self, size_type size) -> data_type { return self.do_allocate(size); }
-
-		/**
-		 * \brief Deallocate a block of memory of size `size`
-		 * \param data the memory block
-		 * \param size the size of block
-		 * \return whether the deallocation was successful, this should always return true
-		 */
-		auto deallocate(this auto& self, data_type data, size_type size) -> bool { return self.do_deallocate(data, size); }
-
-		/**
-		 * \brief clear all data (deallocate memory)
-		 */
-		auto reset(this auto& self) -> void { self.do_reset(); }
-
-		/**
-		 * \brief Dump all information about the model
-		 */
-		auto dump(this auto& self) -> void { self.do_dump(); }
-	};
-
-	class FixedChunkModel final : public IMemoryModel<FixedChunkModel>
-	{
-		friend IMemoryModel<FixedChunkModel>;
-
 	public:
 		/**
 		 * \brief Use the same policy as memory_model_detail::Trap
@@ -587,70 +480,121 @@ namespace gal::gsl::utils
 
 		fixed_chunk* chunk_;
 
-		constexpr auto do_set_initial_size(const size_type initial_size) noexcept -> void { initial_size_ = initial_size; }
+	public:
+		explicit FixedChunkModel(const size_type initial_size = default_initial_size)
+			: initial_size_{initial_size},
+			chunk_{nullptr} {}
 
-		[[nodiscard]] constexpr auto do_get_initial_size() const noexcept -> size_type { return initial_size_; }
+		FixedChunkModel(const FixedChunkModel& other) = delete;
+		FixedChunkModel(FixedChunkModel&& other) noexcept = delete;
+		auto operator=(const FixedChunkModel& other) -> FixedChunkModel& = delete;
+		auto operator=(FixedChunkModel&& other) noexcept -> FixedChunkModel& = delete;
 
-		auto do_set_grow_function(memory_model_grow_function_type&& grow_function) noexcept -> void { grow_function_ = std::forward<decltype(grow_function)>(grow_function); }
+		~FixedChunkModel() noexcept;
 
-		[[nodiscard]] auto do_hole_size_if_grow(const size_type which_hole) const noexcept -> size_type
+		/**
+		 * \brief Reset the initial capacity of the chunk (only for chunks created later)
+		 * \param initial_size the new initial_size
+		 */
+		constexpr auto set_initial_size(const size_type initial_size) noexcept -> void { initial_size_ = initial_size; }
+
+		/**
+		 * \brief Get the initial capacity of the chunk
+		 * \return the initial capacity of the chunk
+		 */
+		[[nodiscard]] constexpr auto get_initial_size() const noexcept -> size_type { return initial_size_; }
+
+		/**
+		 * \brief Set the growth mode of chunk capacity
+		 * \param grow_function the growth mode of chunk capacity
+		 */
+		auto set_grow_function(memory_model_grow_function_type&& grow_function) noexcept -> void { grow_function_ = std::forward<decltype(grow_function)>(grow_function); }
+
+		/**
+		 * \brief If we want to grow the capacity of a chunk, how much the capacity should be
+		 * \param size prev size
+		 * \return the new capacity
+		 */
+		[[nodiscard]] auto size_if_grow(const size_type size) const noexcept -> size_type
 		{
-			if (grow_function_) { return grow_function_(which_hole); }
-			return which_hole * default_grow_multiplier;
+			if (grow_function_) { return grow_function_(size); }
+			return size * default_grow_multiplier;
 		}
 
-		[[nodiscard]] constexpr auto do_inside(const data_type data, const size_type size_per_element) const noexcept -> bool
+		/**
+		 * \brief Determine if data is allocated by us
+		 * \param data the data
+		 * \param size_per_element the element size of data
+		 * \return return true if it is, otherwise, return false
+		 */
+		[[nodiscard]] constexpr auto inside(const data_type data, const size_type size_per_element) const noexcept -> bool
 		{
 			(void)size_per_element;
 			for (const auto* c = chunk_; c; c = c->next) { if (c->inside(data)) { return true; } }
 			return false;
 		}
 
-		[[nodiscard]] auto do_alive(const data_type data, const size_type size_per_element) const noexcept -> bool
-		{
-			(void)data;
-			(void)size_per_element;
-			(void)this;
-			return true;
-		}
-
-		[[nodiscard]] constexpr auto do_used_memory() const noexcept -> size_type
+		/**
+		 * \brief Returns the amount of memory used from `allocate`
+		 * \return the amount of memory used
+		 */
+		[[nodiscard]] constexpr auto used_memory() const noexcept -> size_type
 		{
 			size_type used = 0;
 			for (const auto* c = chunk_; c; c = c->next) { used += c->size; }
 			return used;
 		}
 
-		[[nodiscard]] constexpr auto do_peak_memory() const noexcept -> size_type
-		{
-			(void)this;
-			return 0;
-		}
-
-		[[nodiscard]] auto do_deepest_depth() const noexcept -> size_type
+		/**
+		 * \brief Returns the depth of the chunk
+		 * \return the depth of the chunk
+		 */
+		[[nodiscard]] auto depth() const noexcept -> size_type
 		{
 			size_type depth = 0;
 			for (const auto* c = chunk_; c; c = c->next) { depth += 1; }
 			return depth;
 		}
 
-		[[nodiscard]] auto do_allocated_memory() const noexcept -> size_type
+		/**
+		 * \brief Returns the sum of memory usage for the entire hole and big stuffs
+		 * \return the sum of memory usage
+		 */
+		[[nodiscard]] auto allocated_memory() const noexcept -> size_type
 		{
 			size_type allocated = 0;
 			for (const auto* c = chunk_; c; c = c->next) { allocated += c->capacity; }
 			return allocated;
 		}
 
-		[[nodiscard]] auto do_allocate(size_type size) -> data_type;
+		/**
+		 * \brief Allocate a block of memory of size `size`
+		 * \param size the size of block
+		 * \return the memory block
+		 */
+		[[nodiscard]] auto allocate(size_type size) -> data_type;
 
-		auto do_deallocate(data_type data, size_type size) -> bool;
+		/**
+		 * \brief Deallocate a block of memory of size `size`
+		 * \param data the memory block
+		 * \param size the size of block
+		 * \return whether the deallocation was successful, this should always return true
+		 */
+		auto deallocate(data_type data, size_type size) -> bool;
 
-		auto do_reset() -> void;
+		/**
+		 * \brief clear all data (deallocate memory)
+		 */
+		auto reset() -> void;
+
+		/**
+		 * \brief Dump all information about the model
+		 */
+		auto dump() -> void;
 	};
 
-	class FreeGrowModel final : public IMemoryModel<FreeGrowModel>
+	class FreeGrowModel final
 	{
-		friend IMemoryModel<FreeGrowModel>;
 	public:
 		using data_type = heap_data_type;
 		using size_type = heap_data_size_type;
@@ -724,31 +668,30 @@ namespace gal::gsl::utils
 
 		~FreeGrowModel() noexcept;
 
-	private:
 		/**
 		 * \brief Reset the initial capacity of the hole (only for holes created later)
 		 * \param initial_size the new initial_size
 		 */
-		constexpr auto do_set_initial_size(const size_type initial_size) noexcept -> void { initial_size_ = initial_size; }
+		constexpr auto set_initial_size(const size_type initial_size) noexcept -> void { initial_size_ = initial_size; }
 
 		/**
 		 * \brief Get the initial capacity of the hole
 		 * \return the initial capacity of the hole
 		 */
-		[[nodiscard]] constexpr auto do_get_initial_size() const noexcept -> size_type { return initial_size_; }
+		[[nodiscard]] constexpr auto get_initial_size() const noexcept -> size_type { return initial_size_; }
 
 		/**
 		 * \brief Set the growth mode of hole capacity
 		 * \param grow_function the growth mode of hole capacity
 		 */
-		auto do_set_grow_function(memory_model_grow_function_type&& grow_function) noexcept -> void { grow_function_ = std::forward<decltype(grow_function)>(grow_function); }
+		auto set_grow_function(memory_model_grow_function_type&& grow_function) noexcept -> void { grow_function_ = std::forward<decltype(grow_function)>(grow_function); }
 
 		/**
 		 * \brief If we want to grow the capacity of a hole, how much the capacity should be
 		 * \param which_hole which hole we want to grow
 		 * \return the new capacity
 		 */
-		[[nodiscard]] auto do_hole_size_if_grow(size_type which_hole) const noexcept -> size_type;
+		[[nodiscard]] auto hole_size_if_grow(size_type which_hole) const noexcept -> size_type;
 
 		/**
 		 * \brief Determine if data is allocated by us
@@ -756,7 +699,7 @@ namespace gal::gsl::utils
 		 * \param size_per_element the element size of data
 		 * \return return true if it is, otherwise, return false
 		 */
-		[[nodiscard]] auto do_inside(const data_type data, const size_type size_per_element) const noexcept -> bool { return trap_.inside(data, size_per_element) || big_stuffs_.contains(data); }
+		[[nodiscard]] auto inside(const data_type data, const size_type size_per_element) const noexcept -> bool { return trap_.inside(data, size_per_element) || big_stuffs_.contains(data); }
 
 		/**
 		 * \brief Determine if data is allocated by us and it still valid
@@ -764,38 +707,38 @@ namespace gal::gsl::utils
 		 * \param size_per_element the element size of data
 		 * \return return true if it is, otherwise, return false
 		 */
-		[[nodiscard]] auto do_alive(const data_type data, const size_type size_per_element) const noexcept -> bool { return trap_.alive(data, size_per_element) || big_stuffs_.contains(data); }
+		[[nodiscard]] auto alive(const data_type data, const size_type size_per_element) const noexcept -> bool { return trap_.alive(data, size_per_element) || big_stuffs_.contains(data); }
 
 		/**
 		 * \brief Returns the amount of memory used from `allocate`
 		 * \return the amount of memory used
 		 */
-		[[nodiscard]] constexpr auto do_used_memory() const noexcept -> size_type { return total_allocated_; }
+		[[nodiscard]] constexpr auto used_memory() const noexcept -> size_type { return total_allocated_; }
 
 		/**
 		 * \brief Returns the peak amount of memory used from `allocate`
 		 * \return the peak amount of memory used
 		 */
-		[[nodiscard]] constexpr auto do_peak_memory() const noexcept -> size_type { return allocate_peak_; }
+		[[nodiscard]] constexpr auto peak_memory() const noexcept -> size_type { return allocate_peak_; }
 
 		/**
 		 * \brief Returns the depth of the deepest hole
 		 * \return the depth of the deepest hole
 		 */
-		[[nodiscard]] auto do_deepest_depth() const noexcept -> size_type { return trap_.state().deepest_depth; }
+		[[nodiscard]] auto deepest_depth() const noexcept -> size_type { return trap_.state().deepest_depth; }
 
 		/**
 		 * \brief Returns the sum of memory usage for the entire hole and big stuffs
 		 * \return the sum of memory usage
 		 */
-		[[nodiscard]] auto do_allocated_memory() const noexcept -> size_type;
+		[[nodiscard]] auto allocated_memory() const noexcept -> size_type;
 
 		/**
 		 * \brief Allocate a block of memory of size `size`
 		 * \param size the size of block
 		 * \return the memory block
 		 */
-		[[nodiscard]] auto do_allocate(size_type size) -> data_type;
+		[[nodiscard]] auto allocate(size_type size) -> data_type;
 
 		/**
 		 * \brief Deallocate a block of memory of size `size`
@@ -803,19 +746,18 @@ namespace gal::gsl::utils
 		 * \param size the size of block
 		 * \return whether the deallocation was successful, this should always return true
 		 */
-		auto do_deallocate(data_type data, size_type size) -> bool;
+		auto deallocate(data_type data, size_type size) -> bool;
 
 		/**
 		 * \brief clear all data (deallocate memory)
 		 */
-		auto do_reset() -> void;
+		auto reset() -> void;
 
 		/**
 		 * \brief Dump all information about the model
 		 */
-		auto do_dump() -> void;
+		auto dump() -> void;
 
-	public:
 		#ifdef GSL_ALLOCATIONS_TRACK
 		/**
 		 * \brief Add some extra information to a big stuff, only meaningful for big stuff
