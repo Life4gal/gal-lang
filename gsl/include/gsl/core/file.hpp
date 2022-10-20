@@ -20,15 +20,16 @@
 
 namespace gal::gsl::core
 {
-	struct LineInfo;
+	class LineInfo;
 	class FileInfo;
 	using FileInfoRawHandler = FileInfo*;
 	using FileInfoRawObserver = const FileInfo*;
 	using FileInfoHandler = accelerate::unique_ptr<FileInfo>;
 	class TextFileInfo;
 
-	struct LineInfo
+	class LineInfo
 	{
+	public:
 		static LineInfo dummy_line_info;
 
 		using size_type = int;
