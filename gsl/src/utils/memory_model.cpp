@@ -36,15 +36,26 @@ namespace gal::gsl::utils
 			after_prey_end();
 
 			size_type sweep_size = 0;
-			const size_type last_index = capacity_ / policy_type::size_type_bit_size;
+
+			// Divide the descriptor into several parts according to the `policy_type::aligned_bits`
+			const size_type last_index = capacity_ / policy_type::aligned_bits;
 			for (size_type i = 0; i < last_index; ++i)
 			{
-				for (size_type offset = 0; offset < policy_type::size_type_bit_size; ++offset)
+				// For each copy, there are `policy_type::aligned_bits` bits
+				for (size_type offset = 0; offset < policy_type::aligned_bits; ++offset)
 				{
 					if (const auto mask = size_type{1} << offset;
-						alive(i, mask)) { sweep_size += size_per_prey_; }
+						alive(i, mask))
+					{
+						// It is still alive
+						sweep_size += size_per_prey_;
+					}
 					#ifdef GSL_ALLOCATIONS_SANITIZER
-					else { std::memset(hole_ + static_cast<std::ptrdiff_t>((i * policy_type::size_type_bit_size + offset) * size_per_prey_), 0xcd, size_per_prey_); }
+					else
+					{
+						// It is dead, clean the memory
+						std::memset(hole_ + static_cast<std::ptrdiff_t>((i * policy_type::aligned_bits + offset) * size_per_prey_), 0xcd, size_per_prey_);
+					}
 					#endif
 				}
 			}
@@ -53,13 +64,19 @@ namespace gal::gsl::utils
 
 		auto Hole::sweep(const StackFunction<void(data_type, size_type)>& function) -> void
 		{
-			const size_type last_index = capacity_ / policy_type::size_type_bit_size;
+			// Divide the descriptor into several parts according to the `policy_type::aligned_bits`
+			const size_type last_index = capacity_ / policy_type::aligned_bits;
 			for (size_type i = 0; i < last_index; ++i)
 			{
-				for (size_type offset = 0; offset < policy_type::size_type_bit_size; ++offset)
+				// For each copy, there are `policy_type::aligned_bits` bits
+				for (size_type offset = 0; offset < policy_type::aligned_bits; ++offset)
 				{
 					if (const auto mask = size_type{1} << offset;
-						alive(i, mask)) { function(hole_ + static_cast<std::ptrdiff_t>((i * policy_type::size_type_bit_size + offset) * size_per_prey_), static_cast<size_type>(size_per_prey_)); }
+						alive(i, mask))
+					{
+						// It is still alive, call the function
+						function(hole_ + static_cast<std::ptrdiff_t>((i * policy_type::aligned_bits + offset) * size_per_prey_), static_cast<size_type>(size_per_prey_));
+					}
 				}
 			}
 		}
@@ -76,22 +93,29 @@ namespace gal::gsl::utils
 				return nullptr;
 			}
 
-			// todo
-			const auto last = policy_type::get_descriptor_count(capacity_) / 4;
-			for (size_type i = 0; i < last; ++i)
+			// Divide the descriptor into several parts according to the `policy_type::aligned_bits`
+			const size_type last_index = capacity_ / policy_type::aligned_bits;
+			for (size_type i = 0; i < last_index; ++i)
 			{
-				if (const auto bit = ~hole_descriptor_[current_descriptor_index_])
-				{
-					const auto offset = policy_type::size_type_mask - std::countl_zero(bit);
-					hole_descriptor_[current_descriptor_index_] |= size_type{1} << offset;
-					++caught_;
-					const auto index = (current_descriptor_index_ * policy_type::size_type_bit_size + offset);
+				// Get the bits of the descriptor currently in use
+				const auto bits = hole_descriptor_[current_descriptor_index_];
 
-					gsl_assert(index < capacity_, fmt::format("Index({}) out of bound! This hole's capacity is {}(at {}, size per prey is {})", index, capacity_, static_cast<void*>(hole_), size_per_prey_));
-					return hole_ + static_cast<std::ptrdiff_t>(index * size_per_prey_);
+				if (const auto flip_bits = ~bits)
+				{
+					// `flip_bits` are not equal to 0, which means that there are 0 (dead) bit(s) in `bits`, that is, these bits that can be used again
+					// Find the first bit in `flip_bits` that is the 1 (dead) bit
+					const auto first_one = std::countl_one(flip_bits);
+					// cast to `index`, -1 ==> (count -> index)
+					const auto bit_index = policy_type::aligned_bits - first_one - 1;
+
+					// mark bit alive
+					hole_descriptor_[current_descriptor_index_] |= (size_type{1} << bit_index);
+					++caught_;
+
+					const auto hole_index = (current_descriptor_index_ * policy_type::aligned_bits + bit_index);
+					gsl_assert(hole_index < capacity_, fmt::format("Index({}) out of bound! This hole's capacity is {}(at {}, size per prey is {})", hole_index, capacity_, static_cast<void*>(hole_), size_per_prey_));
+					return hole_ + static_cast<std::ptrdiff_t>(hole_index * size_per_prey_);
 				}
-				++current_descriptor_index_;
-				if (current_descriptor_index_ == last) { current_descriptor_index_ = 0; }
 			}
 
 			gsl_trap("The hole did not catch enough prey, but the descriptor reported that the hole was full");
@@ -103,8 +127,9 @@ namespace gal::gsl::utils
 			const auto [index, offset, mask] = policy_type::get_descriptor_state(hole_, capacity_, size_per_prey_, prey);
 			gsl_assert(policy_type::descriptor_state{index, offset, mask} != policy_type::bad_descriptor, "Invalid descriptor state, maybe it's the prey that doesn't belong to the hole?");
 
-			gsl_assert(hole_descriptor_[current_descriptor_index_] & mask, "The hole can't digest a digested prey!");
+			gsl_assert(alive(current_descriptor_index_, mask), "The hole can't digest a digested prey!");
 
+			// flip that bit
 			hole_descriptor_[current_descriptor_index_] ^= mask;
 			current_descriptor_index_ = index;
 			--caught_;
@@ -115,7 +140,8 @@ namespace gal::gsl::utils
 			const auto [index, offset, mask] = policy_type::get_descriptor_state(hole_, capacity_, size_per_prey_, prey);
 			gsl_assert(policy_type::descriptor_state{index, offset, mask} != policy_type::bad_descriptor, "Invalid descriptor state, maybe it's the prey that doesn't belong to the hole?");
 
-			if (!(hole_descriptor_[current_descriptor_index_] & mask))
+			// Like `alive`, but this time we use `gc_hole_descriptor_` instead of `hole_descriptor_`
+			if (!(gc_hole_descriptor_[current_descriptor_index_] & mask))
 			{
 				// dead
 				gc_hole_descriptor_[index] |= mask;
@@ -133,7 +159,7 @@ namespace gal::gsl::utils
 		auto Trap::dig_hole(const size_type which_hole, const size_type capacity, const size_type size_per_prey, Hole* next) -> Hole*
 		{
 			gsl_assert(which_hole < holes_.size(), "Index out of bound, did you forget to call `which_hole_for_prey` ?");
-			gsl_assert(size_per_prey <= kHeapSmallAllocationThreshold, fmt::format("An allocation of size `{}` cannot be considered a small object allocation.", size_per_prey));
+			gsl_assert(size_per_prey <= heap_small_allocation_threshold, fmt::format("An allocation of size `{}` cannot be considered a small object allocation.", size_per_prey));
 
 			return holes_[which_hole] = heap::new_object<Hole>(capacity, size_per_prey, next);
 		}
@@ -141,7 +167,7 @@ namespace gal::gsl::utils
 		auto Trap::catch_new_one(const size_type size_per_prey) -> Trap::data_type
 		{
 			const auto real_size = policy_type::get_fit_aligned_size(size_per_prey);
-			gsl_assert(real_size <= kHeapSmallAllocationThreshold, fmt::format("An allocation of size `{}` cannot be considered a small object allocation.", size_per_prey));
+			gsl_assert(real_size <= heap_small_allocation_threshold, fmt::format("An allocation of size `{}` cannot be considered a small object allocation.", size_per_prey));
 
 			const auto which_hole = which_hole_for_prey(real_size);
 			for (auto*& hole = holes_[which_hole]; hole; hole = hole->next()) { if (auto* data = hole->catch_new_one()) { return data; } }
@@ -153,7 +179,7 @@ namespace gal::gsl::utils
 		auto Trap::digest_this_one(const data_type prey, size_type size_per_prey) -> void
 		{
 			const auto real_size = policy_type::get_fit_aligned_size(size_per_prey);
-			gsl_assert(real_size <= kHeapSmallAllocationThreshold, fmt::format("An allocation of size `{}` cannot be considered a small object allocation.", size_per_prey));
+			gsl_assert(real_size <= heap_small_allocation_threshold, fmt::format("An allocation of size `{}` cannot be considered a small object allocation.", size_per_prey));
 
 			const auto which_hole = which_hole_for_prey(real_size);
 			for (auto*& hole = holes_[which_hole]; hole; hole = hole->next()) { if (hole->inside(prey)) { hole->digest_this_one(prey); } }
@@ -164,7 +190,7 @@ namespace gal::gsl::utils
 		auto Trap::mark(const data_type prey, size_type size_per_prey) -> bool
 		{
 			const auto real_size = policy_type::get_fit_aligned_size(size_per_prey);
-			gsl_assert(real_size <= kHeapSmallAllocationThreshold, fmt::format("An allocation of size `{}` cannot be considered a small object allocation.", size_per_prey));
+			gsl_assert(real_size <= heap_small_allocation_threshold, fmt::format("An allocation of size `{}` cannot be considered a small object allocation.", size_per_prey));
 
 			const auto which_hole = which_hole_for_prey(real_size);
 			for (auto*& hole = holes_[which_hole]; hole; hole = hole->next())
@@ -237,6 +263,30 @@ namespace gal::gsl::utils
 			}
 		}
 		return true;
+	}
+
+	auto FixedChunkModel::do_reset() -> void
+	{
+		if (chunk_)
+		{
+			if (chunk_->next)
+			{
+				// Only one chunk has insufficient capacity
+
+				// todo: aligned size?
+				using policy = HeapAllocationAlignedPolicy<1024>;
+
+				const auto max_allocated = policy_type::get_fit_aligned_size(used_memory());
+				initial_size_ = std::ranges::max(initial_size_, max_allocated);
+				heap::delete_object(chunk_);
+				chunk_ = nullptr;
+			}
+			else
+			{
+				// One chunk is enough
+				chunk_->size = 0;
+			}
+		}
 	}
 
 	FreeGrowModel::~FreeGrowModel() noexcept
@@ -358,23 +408,7 @@ namespace gal::gsl::utils
 		return false;
 	}
 
-	auto FreeGrowModel::mark(const data_type data, size_type size) -> void
-	{
-		// big stuff
-		if (const auto it = big_stuffs_.find(data);
-			it != big_stuffs_.end())
-		{
-			it->second |= kHeapGcMask;
-			return;
-		}
-
-		if (size > kHeapSmallAllocationThreshold) { return; }
-
-		// small allocation
-		if (!trap_.mark(data, size)) { boost::logger::warn("Cannot mark data(address: {}, size: {}).", static_cast<void*>(data), size); }
-	}
-
-	auto FreeGrowModel::reset() -> void
+	auto FreeGrowModel::do_reset() -> void
 	{
 		for (auto& [data, size]: big_stuffs_)
 		{
@@ -393,6 +427,27 @@ namespace gal::gsl::utils
 		trap_.destroy();
 	}
 
+	auto FreeGrowModel::do_dump() -> void
+	{
+		// todo: our logger
+	}
+
+	auto FreeGrowModel::mark(const data_type data, size_type size) -> void
+	{
+		// big stuff
+		if (const auto it = big_stuffs_.find(data);
+			it != big_stuffs_.end())
+		{
+			it->second |= heap_gc_mask;
+			return;
+		}
+
+		if (size > heap_small_allocation_threshold) { return; }
+
+		// small allocation
+		if (!trap_.mark(data, size)) { boost::logger::warn("Cannot mark data(address: {}, size: {}).", static_cast<void*>(data), size); }
+	}
+
 	auto FreeGrowModel::sweep() -> void
 	{
 		#ifndef GSL_ALLOCATIONS_TRACK
@@ -403,9 +458,9 @@ namespace gal::gsl::utils
 
 		for (auto big_stuff_it = big_stuffs_.begin(); big_stuff_it != big_stuffs_.end();)
 		{
-			if (big_stuff_it->second & kHeapGcMask)
+			if (big_stuff_it->second & heap_gc_mask)
 			{
-				big_stuff_it->second &= ~kHeapGcMask;
+				big_stuff_it->second &= ~heap_gc_mask;
 				total_allocated_ += big_stuff_it->second;
 				++big_stuff_it;
 			}
@@ -419,10 +474,5 @@ namespace gal::gsl::utils
 				big_stuff_it = big_stuffs_.erase(big_stuff_it);
 			}
 		}
-	}
-
-	auto FreeGrowModel::dump() -> void
-	{
-		// todo: our logger
 	}
 }// namespace gal::gsl::utils

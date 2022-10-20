@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <bit>
 #include <type_traits>
 #include <gsl/accelerate/memory.hpp>
 
@@ -14,62 +15,35 @@ namespace gal::gsl
 	using heap_data_type = char*;
 	using heap_data_size_type = std::uint32_t;
 
-	template<typename AlignedType>
-		requires std::is_integral_v<AlignedType>
-	class HeapSmallAllocationPolicy
+	template<std::size_t Bits>
+		requires((Bits & (Bits - 1)) == 0)
+	class HeapAllocationAlignedPolicy
 	{
 	public:
 		using size_type = heap_data_size_type;
 		using data_type = heap_data_type;
 
-		using aligned_type = AlignedType;
+		constexpr static size_type aligned_bits = Bits;
+		// for descriptor
+		constexpr static size_type aligned_bits_mask = aligned_bits - 1;
+		constexpr static size_type aligned_bits_offset = std::countr_zero(aligned_bits);
 
-		template<typename NewAlignedSize>
-			requires std::is_integral_v<NewAlignedSize>
-		using rebind_policy = HeapSmallAllocationPolicy<NewAlignedSize>;
-
-		constexpr static size_type size_type_size = sizeof(aligned_type);
-		constexpr static size_type size_type_bit_size = size_type_size * 8;
-		constexpr static size_type size_type_mask = size_type_bit_size - 1;
-		constexpr static size_type size_type_offset = size_type_size + 1;
-
-		[[nodiscard]] constexpr static auto get_fit_aligned_size(const size_type size) noexcept -> size_type { return (size + size_type_mask) & ~size_type_mask; }
-
-		[[nodiscard]] constexpr static auto get_descriptor_count(const size_type fit_aligned_size) noexcept -> size_type { return fit_aligned_size / 8; }
-
-		struct descriptor_state
-		{
-			size_type index;
-			size_type offset;
-			size_type mask;
-
-			[[nodiscard]] constexpr auto operator==(const descriptor_state& other) const noexcept -> bool = default;
-		};
-
-		constexpr static descriptor_state bad_descriptor{
-				.index = static_cast<size_type>(-1),
-				.offset = static_cast<size_type>(-1),
-				.mask = static_cast<size_type>(-1)};
-
-		[[nodiscard]] constexpr static auto get_descriptor_state(const data_type root, const size_type capacity, const size_type size_per_element, const data_type this_data) noexcept -> descriptor_state
-		{
-			const std::ptrdiff_t test_index = (this_data - root) / size_per_element;
-			if (test_index < 0 || test_index >= capacity)
-			{
-				// todo: let it crash
-				return bad_descriptor;
-			}
-
-			const auto real_index = static_cast<size_type>(test_index);
-			const auto offset = real_index & size_type_mask;
-
-			return {.index = real_index >> size_type_offset, .offset = offset, .mask = size_type{1} << offset};
-		}
+		/**
+		 * \brief Get the smallest (aligned) size
+		 * \param size required size
+		 * \return the smallest (aligned) size
+		 */
+		[[nodiscard]] constexpr static auto get_fit_aligned_size(const size_type size) noexcept -> size_type { return (size + aligned_bits_mask) & ~aligned_bits_mask; }
 	};
 
-	using heap_small_allocation_policy = HeapSmallAllocationPolicy<std::uint32_t>;
-	constexpr heap_data_size_type kHeapSmallAllocationThreshold = 1 << 8;
-	constexpr heap_data_size_type kHeapGcMask = static_cast<heap_data_size_type>(std::numeric_limits<std::make_signed_t<heap_data_size_type>>::max()) + 1;
+	/**
+	 * \brief The allocation size is less than (or equal to) this size to be considered as a "small" allocations
+	 */
+	constexpr heap_data_size_type heap_small_allocation_threshold = 1 << 8;
+	/**
+	 * \brief Use "sign bit" as the mark of gc
+	 */
+	constexpr heap_data_size_type heap_gc_mask = static_cast<heap_data_size_type>(std::numeric_limits<std::make_signed_t<heap_data_size_type>>::max()) + 1;
 
 	#define GSL_ALLOCATIONS_TRACK
 	#define GSL_ALLOCATIONS_SANITIZER

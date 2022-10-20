@@ -28,13 +28,78 @@ namespace gal::gsl::utils
 
 	namespace memory_model_detail
 	{
+		template<std::size_t Bits>
+			requires((Bits & (Bits - 1)) == 0)
+		class SmallAllocationPolicy : public HeapAllocationAlignedPolicy<Bits>
+		{
+		public:
+			using base_type = HeapAllocationAlignedPolicy<Bits>;
+
+			using data_type = typename base_type::data_type;
+			using size_type = typename base_type::size_type;
+
+			constexpr static size_type aligned_bits = base_type::aligned_bits;
+			// for descriptor
+			constexpr static size_type aligned_bits_mask = base_type::aligned_bits_mask;
+			constexpr static size_type aligned_bits_offset = base_type::aligned_bits_offset;
+
+			[[nodiscard]] constexpr static auto get_descriptor_count(const size_type fit_aligned_size) noexcept -> size_type
+			{
+				return fit_aligned_size >> aligned_bits_offset;// fit_aligned_size / aligned_bits;
+			}
+
+			struct descriptor_state
+			{
+				// Part-X in descriptor (descriptor[index])
+				size_type index;
+				// N-th prey
+				size_type offset;
+				// 1 << N (descriptor[index] & mask) ==> alive
+				size_type mask;
+
+				[[nodiscard]] constexpr auto operator==(const descriptor_state& other) const noexcept -> bool = default;
+			};
+
+			constexpr static descriptor_state bad_descriptor{
+					.index = static_cast<size_type>(-1),
+					.offset = static_cast<size_type>(-1),
+					.mask = static_cast<size_type>(-1)};
+
+			[[nodiscard]] constexpr static auto get_descriptor_state(const data_type root, const size_type capacity, const size_type size_per_element, const data_type this_data) noexcept -> descriptor_state
+			{
+				// pointer offset
+				const std::ptrdiff_t test_index = (this_data - root) / size_per_element;
+				if (test_index < 0 || test_index >= capacity)
+				{
+					// todo: let it crash
+					return bad_descriptor;
+				}
+
+				const auto real_index = static_cast<size_type>(test_index);
+				const auto offset = real_index & aligned_bits_mask;
+
+				return {
+						// current pointer distance is equivalent to which part of the descriptor
+						.index = real_index >> aligned_bits_offset,// real_index / aligned_bits
+						// bit offset of this part
+						.offset = offset,
+						// bit mask
+						.mask = size_type{1} << offset};
+			}
+		};
+
 		class Hole final
 		{
 		public:
-			using policy_type = heap_small_allocation_policy;
+			using data_type = heap_data_type;
+			using size_type = heap_data_size_type;
 
-			using data_type = policy_type::data_type;
-			using size_type = policy_type::size_type;
+			constexpr static size_type aligned_size = 32;
+
+			/**
+			 * \brief The capacity of each hole is always aligned to `aligned_size`
+			 */
+			using policy_type = SmallAllocationPolicy<aligned_size>;
 
 		private:
 			size_type capacity_;
@@ -54,9 +119,13 @@ namespace gal::gsl::utils
 
 		public:
 			Hole(const size_type capacity, const size_type size_per_prey, Hole* next)
-				: capacity_{policy_type::get_fit_aligned_size(capacity)},
+				:
+				// get aligned capacity
+				capacity_{policy_type::get_fit_aligned_size(capacity)},
 				size_per_prey_{size_per_prey},
+				// allocate memory based on aligned capacity
 				hole_{static_cast<data_type>(heap::allocate(capacity_ * size_per_prey_))},
+				// get the number of descriptors according to the aligned capacity
 				hole_descriptor_{static_cast<size_type*>(heap::allocate(policy_type::get_descriptor_count(capacity_)))},
 				gc_hole_descriptor_{nullptr},
 				caught_{0},
@@ -117,13 +186,19 @@ namespace gal::gsl::utils
 			[[nodiscard]] constexpr auto inside(const data_type prey) const noexcept -> bool { return prey >= hole_ && prey < hole_ + static_cast<std::ptrdiff_t>(caught_ * size_per_prey_); }
 
 		private:
+			/**
+			 * \brief Get whether the N-th prey of the descriptor in Part-X is still alive (mask is 1<<N and index is X)
+			 * \param index the Part-X
+			 * \param mask the 1<<N
+			 * \return it is still alive or not
+			 */
 			[[nodiscard]] constexpr auto alive(const size_type index, const size_type mask) const noexcept -> bool { return hole_descriptor_[index] & mask; }
 
 		public:
 			/**
 			 * \brief Are the prey in the hole still alive?
 			 * \param prey the prey
-			 * \return it is still alive
+			 * \return it is still alive or not
 			 * \note It is meaningful only when the prey is in the hole, otherwise the program may crash!
 			 */
 			[[nodiscard]] constexpr auto alive(const data_type prey) const noexcept -> bool
@@ -207,12 +282,14 @@ namespace gal::gsl::utils
 			using size_type = Hole::size_type;
 
 			constexpr static size_type size_shift = 4;
-			constexpr static size_type hole_size = kHeapSmallAllocationThreshold >> size_shift;
-			constexpr static size_type size_per_hole = kHeapSmallAllocationThreshold / hole_size;
 
-			// todo: adaptive?
-			using policy_type = heap_small_allocation_policy::rebind_policy<std::uint16_t>;
-			static_assert(policy_type::size_type_bit_size == size_per_hole);
+			constexpr static size_type hole_count = heap_small_allocation_threshold >> size_shift;
+			constexpr static size_type size_per_hole = 1 << size_shift;
+
+			/**
+			 * \brief Divide the whole area considered as "small" allocation into `hole_count` parts, each of which is `size_per_hole` in size, and always align to `size_per_hole` for each allocation
+			 */
+			using policy_type = HeapAllocationAlignedPolicy<size_per_hole>;
 
 			[[nodiscard]] constexpr static auto prey_size_in_hole(const size_type which_hole) noexcept -> size_type { return (which_hole + 1) << size_shift; }
 
@@ -227,7 +304,7 @@ namespace gal::gsl::utils
 			};
 
 		private:
-			std::array<Hole*, hole_size> holes_;
+			std::array<Hole*, hole_count> holes_;
 
 		public:
 			Trap() = default;
@@ -356,17 +433,9 @@ namespace gal::gsl::utils
 	template<typename Derived>
 	class IMemoryModel
 	{
-		// public:
-		// 	using derived_type = Derived;
-		//
-		// 	using data_type = typename derived_type::data_type;
-		// 	using size_type = typename derived_type::size_type;
-
 	private:
-		using policy_type = heap_small_allocation_policy;
-
-		using data_type = policy_type::data_type;
-		using size_type = policy_type::size_type;
+		using data_type = heap_data_type;
+		using size_type = heap_data_size_type;
 
 	public:
 		/**
@@ -454,6 +523,16 @@ namespace gal::gsl::utils
 		 * \return whether the deallocation was successful, this should always return true
 		 */
 		auto deallocate(this auto& self, data_type data, size_type size) -> bool { return self.do_deallocate(data, size); }
+
+		/**
+		 * \brief clear all data (deallocate memory)
+		 */
+		auto reset(this auto& self) -> void { self.do_reset(); }
+
+		/**
+		 * \brief Dump all information about the model
+		 */
+		auto dump(this auto& self) -> void { self.do_dump(); }
 	};
 
 	class FixedChunkModel final : public IMemoryModel<FixedChunkModel>
@@ -461,6 +540,9 @@ namespace gal::gsl::utils
 		friend IMemoryModel<FixedChunkModel>;
 
 	public:
+		/**
+		 * \brief Use the same policy as memory_model_detail::Trap
+		 */
 		using policy_type = memory_model_detail::Trap::policy_type;
 
 		using data_type = policy_type::data_type;
@@ -524,13 +606,13 @@ namespace gal::gsl::utils
 			return false;
 		}
 
-		// [[nodiscard]] auto do_alive(const data_type data, const size_type size_per_element) const noexcept -> bool
-		// {
-		// 	(void)data;
-		// 	(void)size_per_element;
-		// 	(void)this;
-		// 	return true;
-		// }
+		[[nodiscard]] auto do_alive(const data_type data, const size_type size_per_element) const noexcept -> bool
+		{
+			(void)data;
+			(void)size_per_element;
+			(void)this;
+			return true;
+		}
 
 		[[nodiscard]] constexpr auto do_used_memory() const noexcept -> size_type
 		{
@@ -539,11 +621,11 @@ namespace gal::gsl::utils
 			return used;
 		}
 
-		// [[nodiscard]] constexpr auto do_peak_memory() const noexcept -> size_type
-		// {
-		// 	(void)this;
-		// 	return 0;
-		// }
+		[[nodiscard]] constexpr auto do_peak_memory() const noexcept -> size_type
+		{
+			(void)this;
+			return 0;
+		}
 
 		[[nodiscard]] auto do_deepest_depth() const noexcept -> size_type
 		{
@@ -562,16 +644,16 @@ namespace gal::gsl::utils
 		[[nodiscard]] auto do_allocate(size_type size) -> data_type;
 
 		auto do_deallocate(data_type data, size_type size) -> bool;
+
+		auto do_reset() -> void;
 	};
 
 	class FreeGrowModel final : public IMemoryModel<FreeGrowModel>
 	{
 		friend IMemoryModel<FreeGrowModel>;
 	public:
-		using policy_type = heap_small_allocation_policy;
-
-		using data_type = policy_type::data_type;
-		using size_type = policy_type::size_type;
+		using data_type = heap_data_type;
+		using size_type = heap_data_size_type;
 
 		using trap_type = memory_model_detail::Trap;
 
@@ -723,6 +805,16 @@ namespace gal::gsl::utils
 		 */
 		auto do_deallocate(data_type data, size_type size) -> bool;
 
+		/**
+		 * \brief clear all data (deallocate memory)
+		 */
+		auto do_reset() -> void;
+
+		/**
+		 * \brief Dump all information about the model
+		 */
+		auto do_dump() -> void;
+
 	public:
 		#ifdef GSL_ALLOCATIONS_TRACK
 		/**
@@ -745,19 +837,9 @@ namespace gal::gsl::utils
 		auto prepare_for_gc() -> void { trap_.before_prey_begin(); }
 
 		/**
-		 * \brief clear all data (deallocate memory)
-		 */
-		auto reset() -> void;
-
-		/**
 		 * \brief Record all memory allocations
 		 */
 		auto sweep() -> void;
-
-		/**
-		 * \brief Dump all information about the model
-		 */
-		auto dump() -> void;
 
 		/**
 		 * \brief Call function on all alive prey of trap and bif stuff
