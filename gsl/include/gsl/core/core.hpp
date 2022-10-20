@@ -3,6 +3,7 @@
 #include <gsl/core/file.hpp>
 #include <gsl/core/value.hpp>
 #include <gsl/accelerate/string_view.hpp>
+#include <gsl/config.hpp>
 
 namespace gal::gsl::core
 {
@@ -58,5 +59,36 @@ namespace gal::gsl::core
 		// todo: arguments
 
 		virtual auto after_visit(ModuleNode* node) -> ModuleNode* { return node; }
+	};
+
+	struct stack_prologue { };
+
+	class ModuleStackWalker : accelerate::enable_shared_from_this<ModuleStackWalker>
+	{
+	public:
+		virtual ~ModuleStackWalker();
+		ModuleStackWalker() = default;
+		ModuleStackWalker(const ModuleStackWalker&) = default;
+		auto operator=(const ModuleStackWalker&) -> ModuleStackWalker& = default;
+		ModuleStackWalker(ModuleStackWalker&&) = default;
+		auto operator=(ModuleStackWalker&&) -> ModuleStackWalker& = default;
+
+		[[nodiscard]] virtual auto arguments_walkable() -> bool { return true; }
+		[[nodiscard]] virtual auto variables_walkable() -> bool { return true; }
+		[[nodiscard]] virtual auto out_of_scope_variables_walkable() -> bool { return true; }
+
+		virtual auto walk_before_call(stack_prologue* prologue, const heap_data_type data) -> void
+		{
+			(void)prologue;
+			(void)data;
+		}
+
+		// todo: details
+
+		virtual auto walk_after_call(stack_prologue* prologue) -> bool
+		{
+			(void)prologue;
+			return true;
+		}
 	};
 }

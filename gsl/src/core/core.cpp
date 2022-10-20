@@ -13,4 +13,7 @@ namespace gal::gsl::core
 	}
 
 	ModuleVisitor::~ModuleVisitor() = default;
+
+	ModuleStackWalker::~ModuleStackWalker() = default;
+
 }
