@@ -152,4 +152,22 @@ namespace gal::gsl::utils
 			for_each([&](const value_type string) { gsl_verify(intern_list_.insert(string).second); });
 		}
 	}
+
+	auto FixedChunkAllocator::peak_memory() const noexcept -> size_type
+	{
+		gsl_trap("NOT SUPPORTED!");
+		return static_cast<size_type>(-1);
+	}
+
+
+	auto FixedChunkAllocator::mark(data_type data, size_type size) -> void
+	{
+		gsl_trap("NOT SUPPORTED!");
+	}
+
+	auto FixedChunkAllocator::sweep() -> void
+	{
+		gsl_trap("NOT SUPPORTED!");
+	}
+
 }
