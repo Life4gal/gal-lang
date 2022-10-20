@@ -26,38 +26,6 @@ namespace gal::gsl::utils
 	}// namespace allocator_tracker
 	#endif
 
-	StackAllocator::~StackAllocator() { destroy(); }
-
-	auto StackAllocator::push(const size_type size) -> std::pair<bool, stack_state>
-	{
-		gsl_assert(stack_, "Stack is invalid, create a stack first!");
-
-		if (usable() < size) { return {false, {}}; }
-
-		auto ret = std::make_pair(true, state_);
-
-		state_.allocation_top -= size;
-		state_.evaluation_top = state_.allocation_top;
-
-		return ret;
-	}
-
-	auto StackAllocator::push_invoke(const size_type size, const size_type stack_offset) -> std::pair<bool, stack_state>
-	{
-		// push
-		gsl_assert(stack_, "Stack is invalid, create a stack first!");
-
-		if (usable() < size) { return {false, {}}; }
-
-		auto ret = std::make_pair(true, state_);
-
-		state_.allocation_top -= size;
-		// invoke
-		state_.evaluation_top = end() + stack_offset;
-
-		return ret;
-	}
-
 	AllocatorBase::~AllocatorBase() = default;
 
 	auto StringAllocatorBase::construct(value_type string) -> StringAllocatorBase::value_type
@@ -160,14 +128,7 @@ namespace gal::gsl::utils
 	}
 
 
-	auto FixedChunkAllocator::mark(data_type data, size_type size) -> void
-	{
-		gsl_trap("NOT SUPPORTED!");
-	}
+	auto FixedChunkAllocator::mark(data_type data, size_type size) -> void { gsl_trap("NOT SUPPORTED!"); }
 
-	auto FixedChunkAllocator::sweep() -> void
-	{
-		gsl_trap("NOT SUPPORTED!");
-	}
-
+	auto FixedChunkAllocator::sweep() -> void { gsl_trap("NOT SUPPORTED!"); }
 }
