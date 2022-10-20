@@ -17,6 +17,7 @@ namespace gal::gsl::type
 		UNSIGNED_LONG_INTEGER,// integer.hpp
 		SINGLE_PRECISION,	  // floating_point.hpp
 		DOUBLE_PRECISION,	  // floating_point.hpp
+		RAW_STRING,				// raw_string.hpp
 		VEC4_FLOAT,				// wide.hpp
 		VEC4_SIGNED,			// wide.hpp
 		VEC4_UNSIGNED,			// wide.hpp
