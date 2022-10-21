@@ -87,18 +87,15 @@ namespace gal::gsl::type
 		[[nodiscard]] constexpr auto is_locked() const noexcept -> lock_type { return data_.is_locked(); }
 		[[nodiscard]] constexpr auto lock_count() const noexcept -> lock_type { return data_.lock_count(); }
 
-		auto lock(core::ModuleContext& context) const -> void;
-		auto unlock(core::ModuleContext& context) const -> void;
+		auto lock(core::ModuleContext& context) const -> void { data_.lock(context); }
+
+		auto unlock(core::ModuleContext& context) const -> void { data_.unlock(context); }
 
 		auto clear(core::ModuleContext& context) -> void;
 
 		[[nodiscard]] auto keys(core::ModuleContext& context, size_type type_size) -> sequence;
 		[[nodiscard]] auto values(core::ModuleContext& context, size_type type_size) -> sequence;
 
-		[[nodiscard]] auto hash(const std::ptrdiff_t index) const noexcept -> hash_type
-		{
-			gsl_assert(index < capacity(), "index out of range!");
-			return hashes_[index];
-		}
+		[[nodiscard]] auto hash(std::ptrdiff_t index) const noexcept -> hash_type;
 	};
 }
