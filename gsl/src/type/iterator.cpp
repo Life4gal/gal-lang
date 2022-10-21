@@ -1,5 +1,8 @@
 #include <gsl/type/iterator.hpp>
 
+#include <gsl/core/core.hpp>
+#include <gsl/utils/allocator.hpp>
+
 namespace gal::gsl::type
 {
 	Iterator::~Iterator() = default;
@@ -28,7 +31,8 @@ namespace gal::gsl::type
 
 	auto TrivialIterator::done(core::ModuleContext& context) -> void
 	{
-		// todo: deallocate this
-		(void)context;
+		const auto allocator = context.allocator()(__func__);
+
+		allocator->deallocate(reinterpret_cast<utils::AllocatorBase::data_type>(this), static_cast<utils::AllocatorBase::size_type>(size_));
 	}
 }

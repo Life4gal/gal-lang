@@ -2,6 +2,9 @@
 
 #include <span>
 #include <gsl/utils/assert.hpp>
+#include <gsl/core/core.hpp>
+
+#include "gsl/utils/allocator.hpp"
 
 namespace gal::gsl::type
 {
@@ -11,27 +14,21 @@ namespace gal::gsl::type
 
 		++lock_;
 
-		// todo: context check lock overflow?
-		(void)context;
+		if (lock_ == 0) { context.throw_error("Vector lock overflow!"); }
 	}
 
 	auto Vector::unlock(core::ModuleContext& context) const -> void
 	{
 		if (shared || dead) { return; }
 
-		// todo: context check lock underflow?
-		(void)context;
+		if (lock_ == 0) { context.throw_error("Vector lock underflow!"); }
 
 		--lock_;
 	}
 
 	auto Vector::reserve(core::ModuleContext& context, const size_type new_capacity, const type_descriptor::size_type type_size) -> void
 	{
-		if (is_locked())
-		{
-			// todo: cannot change a vector's capacity if it locked
-			return;
-		}
+		if (is_locked()) { context.throw_error("Cannot change a vector's capacity if it locked"); }
 
 		if (capacity_ >= new_capacity)
 		{
@@ -39,23 +36,30 @@ namespace gal::gsl::type
 			return;
 		}
 
-		// todo: do memory allocate
-		(void)context;
-		(void)type_size;
+		const auto allocator = context.allocator()(__func__);
+
+		if (auto* new_data = allocator->allocate(static_cast<utils::AllocatorBase::size_type>(new_capacity * type_size))) { context.throw_error("Cannot allocator more memory!"); }
+		else
+		{
+			allocator->mark(new_data, {.comment = __func__});
+			// copy data
+			copy_into(vector_descriptor{}, new_data, data_, capacity_);
+			data_ = new_data;
+			capacity_ = new_capacity;
+		}
 	}
 
 	auto Vector::resize(core::ModuleContext& context, const size_type new_size, const type_descriptor::size_type type_size, const bool zero_it) -> void
 	{
-		if (is_locked())
-		{
-			(void)context;
-			// todo: cannot change a vector's size if it locked
-			return;
-		}
+		if (is_locked()) { context.throw_error("Cannot resize a vector if it locked"); }
 
 		if (new_size > capacity_)
 		{
-			// todo: grow vector
+			const auto new_capacity = std::ranges::max(
+					size_type{16},
+					size_type{1} << (std::countl_zero(size_type{}) - std::countl_zero(std::ranges::max(new_size, size_type{2}) - 1))
+					);
+			reserve(context, new_capacity, type_size);
 		}
 
 		if (zero_it && new_size > size_) { std::memset(data_ + size_ * type_size, 0, (new_size - size_) * type_size); }
@@ -64,12 +68,7 @@ namespace gal::gsl::type
 
 	auto Vector::clear(core::ModuleContext& context) -> void
 	{
-		if (is_locked())
-		{
-			(void)context;
-			// todo: cannot clear a vector if it locked
-			return;
-		}
+		if (is_locked()) { context.throw_error("Cannot clear a vector if it locked"); }
 
 		size_ = 0;
 	}
@@ -95,7 +94,7 @@ namespace gal::gsl::type
 				[](Vector& d) { d = {}; });
 	}
 
-	auto vector_descriptor::copy_into_impl(void* dest, const void* source, size_type count) -> void
+	auto vector_descriptor::copy_into_impl(void* dest, const void* source, const size_type count) -> void
 	{
 		const auto vector_source = std::span{static_cast<const Vector*>(source), count};
 		std::ranges::for_each(

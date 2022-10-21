@@ -32,7 +32,7 @@ namespace gal::gsl::type
 
 	template<typename TypeDescriptor>
 		requires(std::derived_from<TypeDescriptor, type_descriptor> && !std::is_same_v<TypeDescriptor, type_descriptor>)
-	constexpr auto copy_info(const TypeDescriptor& descriptor, void* dest, const void* source, const type_descriptor::size_type count) -> void { descriptor.copy_info(dest, source, count); }
+	constexpr auto copy_into(const TypeDescriptor& descriptor, void* dest, const void* source, const type_descriptor::size_type count) -> void { descriptor.copy_info(dest, source, count); }
 
 	template<typename TypeDescriptor>
 		requires(std::derived_from<TypeDescriptor, type_descriptor> && !std::is_same_v<TypeDescriptor, type_descriptor>)
