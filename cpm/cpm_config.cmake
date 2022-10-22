@@ -53,6 +53,8 @@ macro(CPM_link_libraries_APPEND lib_name link_type)
 		)
 	endif(${lib_name}_ADDED)
 
+	add_dependencies(${PROJECT_NAME} ${lib_name})
+
 	###############################################
 	############### LINK_LIBRARY ##################
 	###############################################
