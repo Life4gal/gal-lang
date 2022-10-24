@@ -7,6 +7,7 @@
 #include <lexy_ext/report_error.hpp> // lexy_ext::report_error
 
 #include <exception>
+#include <iostream>
 
 namespace
 {
@@ -15,6 +16,31 @@ namespace
 
 	namespace parser
 	{
+		struct comment : public lexy::token_production
+		{
+			struct single_line : public lexy::transparent_production
+			{
+				constexpr static auto rule = dsl::delimited(dsl::lit_c<'#'>, dsl::newline)(dsl::code_point);
+				constexpr static auto value = lexy::as_string<parse::node_comment::value_type, lexy::utf8_encoding>;
+			};
+
+			struct multi_line_single_quotation : public lexy::transparent_production
+			{
+				constexpr static auto rule = dsl::delimited(LEXY_LIT("'''"), LEXY_LIT("'''"))(dsl::code_point);
+				constexpr static auto value = lexy::as_string<parse::node_comment::value_type, lexy::utf8_encoding>;
+			};
+
+			struct multi_line_double_quotation : public lexy::transparent_production
+			{
+				constexpr static auto rule = dsl::delimited(LEXY_LIT("\"\"\""), LEXY_LIT("\"\"\""))(dsl::code_point);
+				constexpr static auto value = lexy::as_string<parse::node_comment::value_type, lexy::utf8_encoding>;
+			};
+
+			constexpr static auto rule = dsl::p<single_line> | dsl::p<multi_line_single_quotation> | dsl::p<multi_line_double_quotation>;
+
+			constexpr static auto value = lexy::construct<parse::node_comment>;
+		};
+
 		struct boolean : public lexy::token_production
 		{
 			struct true_part : lexy::transparent_production
@@ -147,7 +173,7 @@ namespace
 						dsl::p<string>;
 				// constexpr auto complex	 = dsl::p<>;
 
-				return primitive | /* dsl::complex | */ dsl::error<expected_node>;
+				return dsl::p<comment> | primitive | /* complex | */ dsl::error<expected_node>;
 			}();
 
 			constexpr static auto value = lexy::construct<parse::Node>;
@@ -164,18 +190,18 @@ namespace
 			constexpr static auto max_recursion_depth = 32;
 
 			// Whitespace is a sequence of space, tab, carriage return, or newline.
-			constexpr static auto whitespace = dsl::ascii::space / dsl::ascii::newline;
+			constexpr static auto whitespace = dsl::ascii::space;
 
 			struct node_tree_part
 			{
-				struct unexpected_trailing_comma
-				{
-					static constexpr auto name = "unexpected trailing comma";
-				};
+				constexpr static auto rule = dsl::brackets(
+						LEXY_LIT("BEGIN"),
+						LEXY_LIT("END")
+						).opt_list(
+						dsl::recurse<node>//,
+						//dsl::sep(dsl::eol)
+						);
 
-				// todo
-				constexpr static auto rule = dsl::square_bracketed.opt_list(dsl::recurse<node>,dsl::sep(dsl::comma).trailing_error<unexpected_trailing_comma>);
-				
 				constexpr static auto value = lexy::as_list<parse::node_tree_result>;
 			};
 

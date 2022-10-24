@@ -8,6 +8,16 @@
 
 namespace gal::gsl::parse
 {
+	struct node_comment
+	{
+		using value_type = string::string;
+
+		value_type value;
+
+		template<typename Function>
+		auto invoke(Function&& function) const -> void { std::invoke(std::forward<Function>(function), value); }
+	};
+
 	struct node_bool
 	{
 		bool value;
@@ -52,6 +62,7 @@ namespace gal::gsl::parse
 	{
 	public:
 		using value_type = std::variant<
+			node_comment,
 			node_bool,
 			node_number,
 			node_string>;
