@@ -21,28 +21,28 @@ namespace gal::gsl::memory
 	{
 	public:
 		using allocator_type = AnyAllocator<T>;
-		using trait_type = std::allocator_traits<allocator_type>;
+		// using trait_type = std::allocator_traits<allocator_type>;
 
-		using value_type = typename trait_type::value_type;
+		using value_type = T;//typename trait_type::value_type;
 
-		using pointer = typename trait_type::pointer;
-		using const_pointer = typename trait_type::const_pointer;
-		using void_pointer = typename trait_type::void_pointer;
-		using const_void_pointer = typename trait_type::const_void_pointer;
+		using pointer = T*;                    //typename trait_type::pointer;
+		using const_pointer = const T*;        //typename trait_type::const_pointer;
+		using void_pointer = void*;            //typename trait_type::void_pointer;
+		using const_void_pointer = const void*;//typename trait_type::const_void_pointer;
 
-		using size_type = typename trait_type::size_type;
-		using difference_type = typename trait_type::difference_type;
+		using size_type = std::size_t;         //typename trait_type::size_type;
+		using difference_type = std::ptrdiff_t;//typename trait_type::difference_type;
 
-		using propagate_on_container_copy_assignment = typename trait_type::propagate_on_container_copy_assignment;
-		using propagate_on_container_move_assignment = typename trait_type::propagate_on_container_move_assignment;
-		using propagate_on_container_swap = typename trait_type::propagate_on_container_swap;
-		using is_always_equal = typename trait_type::is_always_equal;
-
-		template<typename U>
-		using rebind_alloc = typename trait_type::template rebind_alloc<U>;
+		using propagate_on_container_copy_assignment = std::true_type;//typename trait_type::propagate_on_container_copy_assignment;
+		using propagate_on_container_move_assignment = std::true_type;//typename trait_type::propagate_on_container_move_assignment;
+		using propagate_on_container_swap = std::true_type;           //typename trait_type::propagate_on_container_swap;
+		using is_always_equal = std::true_type;                       //typename trait_type::is_always_equal;
 
 		template<typename U>
-		using rebind_traits = typename trait_type::template rebind_traits<U>;
+		using rebind_alloc = AnyAllocator<U>;//typename trait_type::template rebind_alloc<U>;
+
+		// template<typename U>
+		// using rebind_traits = typename trait_type::template rebind_traits<U>;
 
 		constexpr AnyAllocator() noexcept = default;
 		constexpr AnyAllocator(const AnyAllocator&) noexcept = default;
@@ -54,17 +54,17 @@ namespace gal::gsl::memory
 		template<typename U>
 		constexpr explicit(false) AnyAllocator(const AnyAllocator<U>&) noexcept {}
 
-		[[nodiscard]] constexpr auto allocate(const size_type size) -> pointer
+		[[nodiscard]] auto allocate(const size_type size) -> pointer
 		{
 			(void)this;
 
 			static_assert(sizeof(value_type), "value_type must be complete before calling allocate.");
 
-			if constexpr (can_allocate_atomic_v<value_type>) { return static_cast<pointer>(memory::allocate_without_pointer(size)); }
+			if constexpr (can_allocate_atomic_v<value_type>) { return static_cast<pointer>(allocate_without_pointer(size)); }
 			else { return static_cast<pointer>(memory::allocate(size * sizeof(value_type))); }
 		}
 
-		constexpr auto deallocate(const pointer pointer, const size_type size) noexcept -> void
+		auto deallocate(const pointer pointer, const size_type size) noexcept -> void
 		{
 			(void)this;
 			(void)size;
@@ -81,28 +81,28 @@ namespace gal::gsl::memory
 	{
 	public:
 		using allocator_type = StlAllocator<T>;
-		using trait_type = std::allocator_traits<allocator_type>;
+		// using trait_type = std::allocator_traits<allocator_type>;
 
-		using value_type = typename trait_type::value_type;
+		using value_type = T;//typename trait_type::value_type;
 
-		using pointer = typename trait_type::pointer;
-		using const_pointer = typename trait_type::const_pointer;
-		using void_pointer = typename trait_type::void_pointer;
-		using const_void_pointer = typename trait_type::const_void_pointer;
+		using pointer = T*;                    //typename trait_type::pointer;
+		using const_pointer = const T*;        //typename trait_type::const_pointer;
+		using void_pointer = void*;            //typename trait_type::void_pointer;
+		using const_void_pointer = const void*;//typename trait_type::const_void_pointer;
 
-		using size_type = typename trait_type::size_type;
-		using difference_type = typename trait_type::difference_type;
+		using size_type = std::size_t;         //typename trait_type::size_type;
+		using difference_type = std::ptrdiff_t;//typename trait_type::difference_type;
 
-		using propagate_on_container_copy_assignment = typename trait_type::propagate_on_container_copy_assignment;
-		using propagate_on_container_move_assignment = typename trait_type::propagate_on_container_move_assignment;
-		using propagate_on_container_swap = typename trait_type::propagate_on_container_swap;
-		using is_always_equal = typename trait_type::is_always_equal;
-
-		template<typename U>
-		using rebind_alloc = typename trait_type::template rebind_alloc<U>;
+		using propagate_on_container_copy_assignment = std::true_type;//typename trait_type::propagate_on_container_copy_assignment;
+		using propagate_on_container_move_assignment = std::true_type;//typename trait_type::propagate_on_container_move_assignment;
+		using propagate_on_container_swap = std::true_type;           //typename trait_type::propagate_on_container_swap;
+		using is_always_equal = std::true_type;                       //typename trait_type::is_always_equal;
 
 		template<typename U>
-		using rebind_traits = typename trait_type::template rebind_traits<U>;
+		using rebind_alloc = StlAllocator<U>;//typename trait_type::template rebind_alloc<U>;
+
+		// template<typename U>
+		// using rebind_traits = typename trait_type::template rebind_traits<U>;
 
 		constexpr StlAllocator() noexcept = default;
 		constexpr StlAllocator(const StlAllocator&) noexcept = default;
@@ -114,17 +114,17 @@ namespace gal::gsl::memory
 		template<typename U>
 		constexpr explicit(false) StlAllocator(const StlAllocator<U>&) noexcept { }
 
-		[[nodiscard]] constexpr auto allocate(const size_type size) -> pointer
+		[[nodiscard]] auto allocate(const size_type size) -> pointer
 		{
 			(void)this;
 
 			static_assert(sizeof(value_type), "value_type must be complete before calling allocate.");
 
-			if constexpr (can_allocate_atomic_v<value_type>) { return static_cast<pointer>(memory::allocate_without_collect_and_pointer(size)); }
-			else { return static_cast<pointer>(memory::allocate_without_collect(size * sizeof(value_type))); }
+			if constexpr (can_allocate_atomic_v<value_type>) { return static_cast<pointer>(allocate_without_collect_and_pointer(size)); }
+			else { return static_cast<pointer>(allocate_without_collect(size * sizeof(value_type))); }
 		}
 
-		constexpr auto deallocate(const pointer pointer, const size_type size) noexcept -> void
+		auto deallocate(const pointer pointer, const size_type size) noexcept -> void
 		{
 			(void)this;
 			(void)size;
@@ -167,82 +167,82 @@ namespace gal::gsl::memory
 	};
 }
 
-template<typename T>
-struct std::allocator_traits<gal::gsl::memory::AnyAllocator<T>>
-{
-	using allocator_type = gal::gsl::memory::AnyAllocator<T>;
-
-	using value_type = T;
-
-	using pointer = value_type*;
-	using const_pointer = const value_type*;
-	using void_pointer = void*;
-	using const_void_pointer = const void*;
-
-	using size_type = size_t;
-	using difference_type = ptrdiff_t;
-
-	using propagate_on_container_copy_assignment = true_type;
-	using propagate_on_container_move_assignment = true_type;
-	using propagate_on_container_swap = true_type;
-	using is_always_equal = true_type;
-
-	template<typename U>
-	using rebind_alloc = gal::gsl::memory::AnyAllocator<U>;
-
-	template<typename U>
-	using rebind_traits = allocator_traits<rebind_alloc<U>>;
-
-	[[nodiscard]] constexpr static auto allocate(allocator_type& allocator, const size_type size) -> pointer { return allocator.allocate(size); }
-
-	constexpr static auto deallocate(allocator_type& allocator, const pointer pointer, const size_type size) noexcept -> void { allocator.deallocate(pointer, size); }
-
-	template<typename... Args>
-	constexpr static auto construct([[maybe_unused]] allocator_type& allocator, pointer pointer, Args&&... args) noexcept(std::is_nothrow_constructible_v<value_type, Args...>) -> void { std::construct_at(pointer, std::forward<Args>(args)...); }
-
-	constexpr static auto destroy([[maybe_unused]] allocator_type& allocator, pointer pointer) noexcept(std::is_nothrow_destructible_v<value_type>) -> void { std::destroy_at(pointer); }
-
-	[[nodiscard]] constexpr static auto max_size([[maybe_unused]] const allocator_type& allocator) noexcept -> size_type { return static_cast<size_type>(-1) / sizeof(value_type); }
-
-	[[nodiscard]] constexpr static auto select_on_container_copy_construction(const allocator_type& allocator) noexcept -> allocator_type { return allocator; }
-};
-
-template<typename T>
-struct std::allocator_traits<gal::gsl::memory::StlAllocator<T>>
-{
-	using allocator_type = gal::gsl::memory::StlAllocator<T>;
-
-	using value_type = T;
-
-	using pointer = value_type*;
-	using const_pointer = const value_type*;
-	using void_pointer = void*;
-	using const_void_pointer = const void*;
-
-	using size_type = size_t;
-	using difference_type = ptrdiff_t;
-
-	using propagate_on_container_copy_assignment = true_type;
-	using propagate_on_container_move_assignment = true_type;
-	using propagate_on_container_swap = true_type;
-	using is_always_equal = true_type;
-
-	template<typename U>
-	using rebind_alloc = gal::gsl::memory::StlAllocator<U>;
-
-	template<typename U>
-	using rebind_traits = allocator_traits<rebind_alloc<U>>;
-
-	[[nodiscard]] constexpr static auto allocate(allocator_type& allocator, const size_type size) -> pointer { return allocator.allocate(size); }
-
-	constexpr static auto deallocate(allocator_type& allocator, const pointer pointer, const size_type size) noexcept -> void { allocator.deallocate(pointer, size); }
-
-	template<typename... Args>
-	constexpr static auto construct([[maybe_unused]] allocator_type& allocator, pointer pointer, Args&&... args) noexcept(std::is_nothrow_constructible_v<value_type, Args...>) -> void { std::construct_at(pointer, std::forward<Args>(args)...); }
-
-	constexpr static auto destroy([[maybe_unused]] allocator_type& allocator, pointer pointer) noexcept(std::is_nothrow_destructible_v<value_type>) -> void { std::destroy_at(pointer); }
-
-	[[nodiscard]] constexpr static auto max_size([[maybe_unused]] const allocator_type& allocator) noexcept -> size_type { return static_cast<size_type>(-1) / sizeof(value_type); }
-
-	[[nodiscard]] constexpr static auto select_on_container_copy_construction(const allocator_type& allocator) noexcept -> allocator_type { return allocator; }
-};
+// template<typename T>
+// struct std::allocator_traits<gal::gsl::memory::AnyAllocator<T>>
+// {
+// 	using allocator_type = gal::gsl::memory::AnyAllocator<T>;
+//
+// 	using value_type = T;
+//
+// 	using pointer = value_type*;
+// 	using const_pointer = const value_type*;
+// 	using void_pointer = void*;
+// 	using const_void_pointer = const void*;
+//
+// 	using size_type = size_t;
+// 	using difference_type = ptrdiff_t;
+//
+// 	using propagate_on_container_copy_assignment = true_type;
+// 	using propagate_on_container_move_assignment = true_type;
+// 	using propagate_on_container_swap = true_type;
+// 	using is_always_equal = true_type;
+//
+// 	template<typename U>
+// 	using rebind_alloc = gal::gsl::memory::AnyAllocator<U>;
+//
+// 	template<typename U>
+// 	using rebind_traits = allocator_traits<rebind_alloc<U>>;
+//
+// 	[[nodiscard]] constexpr static auto allocate(allocator_type& allocator, const size_type size) -> pointer { return allocator.allocate(size); }
+//
+// 	constexpr static auto deallocate(allocator_type& allocator, const pointer pointer, const size_type size) noexcept -> void { allocator.deallocate(pointer, size); }
+//
+// 	template<typename... Args>
+// 	constexpr static auto construct([[maybe_unused]] allocator_type& allocator, pointer pointer, Args&&... args) noexcept(std::is_nothrow_constructible_v<value_type, Args...>) -> void { std::construct_at(pointer, std::forward<Args>(args)...); }
+//
+// 	constexpr static auto destroy([[maybe_unused]] allocator_type& allocator, pointer pointer) noexcept(std::is_nothrow_destructible_v<value_type>) -> void { std::destroy_at(pointer); }
+//
+// 	[[nodiscard]] constexpr static auto max_size([[maybe_unused]] const allocator_type& allocator) noexcept -> size_type { return static_cast<size_type>(-1) / sizeof(value_type); }
+//
+// 	[[nodiscard]] constexpr static auto select_on_container_copy_construction(const allocator_type& allocator) noexcept -> allocator_type { return allocator; }
+// };
+//
+// template<typename T>
+// struct std::allocator_traits<gal::gsl::memory::StlAllocator<T>>
+// {
+// 	using allocator_type = gal::gsl::memory::StlAllocator<T>;
+//
+// 	using value_type = T;
+//
+// 	using pointer = value_type*;
+// 	using const_pointer = const value_type*;
+// 	using void_pointer = void*;
+// 	using const_void_pointer = const void*;
+//
+// 	using size_type = size_t;
+// 	using difference_type = ptrdiff_t;
+//
+// 	using propagate_on_container_copy_assignment = true_type;
+// 	using propagate_on_container_move_assignment = true_type;
+// 	using propagate_on_container_swap = true_type;
+// 	using is_always_equal = true_type;
+//
+// 	template<typename U>
+// 	using rebind_alloc = gal::gsl::memory::StlAllocator<U>;
+//
+// 	template<typename U>
+// 	using rebind_traits = allocator_traits<rebind_alloc<U>>;
+//
+// 	[[nodiscard]] constexpr static auto allocate(allocator_type& allocator, const size_type size) -> pointer { return allocator.allocate(size); }
+//
+// 	constexpr static auto deallocate(allocator_type& allocator, const pointer pointer, const size_type size) noexcept -> void { allocator.deallocate(pointer, size); }
+//
+// 	template<typename... Args>
+// 	constexpr static auto construct([[maybe_unused]] allocator_type& allocator, pointer pointer, Args&&... args) noexcept(std::is_nothrow_constructible_v<value_type, Args...>) -> void { std::construct_at(pointer, std::forward<Args>(args)...); }
+//
+// 	constexpr static auto destroy([[maybe_unused]] allocator_type& allocator, pointer pointer) noexcept(std::is_nothrow_destructible_v<value_type>) -> void { std::destroy_at(pointer); }
+//
+// 	[[nodiscard]] constexpr static auto max_size([[maybe_unused]] const allocator_type& allocator) noexcept -> size_type { return static_cast<size_type>(-1) / sizeof(value_type); }
+//
+// 	[[nodiscard]] constexpr static auto select_on_container_copy_construction(const allocator_type& allocator) noexcept -> allocator_type { return allocator; }
+// };
