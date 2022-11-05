@@ -378,7 +378,7 @@ namespace grammar
 			{
 				// mut [type variable] = expression
 				// immutable variable should have initializer
-				return LEXY_KEYWORD("mut", identifier::rule) >> dsl::position + dsl::p<variable_declaration_with_optional_assign>;
+				return LEXY_KEYWORD("mut", identifier::rule) >> (dsl::position + dsl::p<variable_declaration_with_optional_assign>);
 			}();
 
 			constexpr static auto value = ParseState::callback<void>(
@@ -402,7 +402,7 @@ namespace grammar
 			{
 				// [type variable] [= expression]
 				// mutable variable may not have initializer
-				return dsl::else_ >> dsl::position + dsl::p<variable_declaration_with_assignment>;
+				return dsl::else_ >> (dsl::position + dsl::p<variable_declaration_with_assignment>);
 			}();
 
 			static constexpr auto value = ParseState::callback<void>(
@@ -421,9 +421,9 @@ namespace grammar
 
 		constexpr static auto rule =
 				LEXY_KEYWORD("global", identifier::rule) >>
-				(dsl::p<mutable_global> | dsl::p<immutable_global>) +
+				((dsl::p<mutable_global> | dsl::p<immutable_global>) +
 				// semicolon required ?
-				dsl::semicolon;
+				dsl::semicolon);
 
 		constexpr static auto value = lexy::forward<void>;
 	};
@@ -499,7 +499,7 @@ namespace grammar
 
 		struct body
 		{
-			constexpr static auto rule = dsl::curly_bracketed.open() >> dsl::p<expression> + dsl::curly_bracketed.close();
+			constexpr static auto rule = dsl::curly_bracketed.open() >> (dsl::p<expression> + dsl::curly_bracketed.close());
 
 			constexpr static auto value = ParseState::callback<void>(
 					[](const ParseState& state, gsl::ast::expression_type&& body) -> void { state.current_function->set_function_body(std::move(body)); }
@@ -509,9 +509,9 @@ namespace grammar
 		constexpr static auto rule =
 				LEXY_KEYWORD("fn", identifier::rule) >>
 				// function declaration
-				dsl::p<header> +
+				(dsl::p<header> +
 				// function body
-				dsl::p<body>;
+				dsl::p<body>);
 
 		constexpr static auto value = lexy::forward<void>;
 	};
@@ -566,7 +566,7 @@ namespace gal::gsl::frontend
 		if (!file)
 		{
 			// todo
-			throw std::exception{"Cannot read file!"};
+			throw std::runtime_error{"Cannot read file!"};
 		}
 
 		ParseState state{string::string{filename}, std::move(file).buffer()};
@@ -575,7 +575,7 @@ namespace gal::gsl::frontend
 			!result.is_success())
 		{
 			// todo: handle it?
-			throw std::exception{"Cannot parse file!"};
+			throw std::runtime_error{"Cannot parse file!"};
 		}
 
 		return state.mod;
