@@ -13,7 +13,7 @@ name: "CodeQL"
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "workflows" ]
   pull_request:
     # The branches below must be a subset of the branches above
     branches: [ "main" ]
@@ -52,7 +52,13 @@ jobs:
         # Details on CodeQL's query packs refer to : https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning#using-queries-in-ql-packs
         # queries: security-extended,security-and-quality
 
-        
+    - name: Install GCC-11
+    # run: sudo apt update && sudo apt full-upgrade && sudo apt install gcc-11 g++-11
+      run: sudo apt update && sudo apt install gcc-11 g++-11
+
+    - name: Setup GCC
+      run: sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100 --slave /usr/bin/g++ g++ /usr/bin/g++-11 --slave /usr/bin/gcov gcov /usr/bin/gcov-11
+      
     # Autobuild attempts to build any compiled languages  (C/C++, C#, Go, or Java).
     # If this step fails, then you should remove it and run the build manually (see below)
     - name: Autobuild
