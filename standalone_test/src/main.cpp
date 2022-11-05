@@ -1,7 +1,7 @@
 #include <iostream>
 #include <gsl/memory/allocator.hpp>
 #include <span>
-#include <gsl/parse/parser.hpp>
+#include <gsl/frontend/parse.hpp>
 
 auto main() -> int
 {
@@ -23,8 +23,9 @@ auto main() -> int
 
 	try
 	{
-		for (const auto result = gal::gsl::parse::parse_file("test.txt");
-			const auto& node: result) { node.invoke([](const auto& v) { std::cout << v << '\t'; }); }
+		if (const auto mod = gal::gsl::frontend::parse_file("test.txt"); 
+			!mod) { std::cout << "module '" << mod->get_name() << "' pass failed...\n"; }
+		else { std::cout << "module '" << mod->get_name() << "' pass done...\n"; }
 	}
 	catch (const std::exception& e) { std::cout << "parse failed: " << e.what() << '\n'; }
 }

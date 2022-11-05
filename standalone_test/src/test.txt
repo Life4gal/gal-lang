@@ -1,0 +1,10 @@
+module test_module;
+
+# todo: expression not implement yet
+global int immutable_var = fake_expression;
+global mut int mutable_var;
+
+fn test_fun(int arg1, float arg2, double arg3) -> string
+{
+	fake_expression
+}
