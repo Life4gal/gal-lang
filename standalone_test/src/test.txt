@@ -1,10 +1,9 @@
 module test_module;
 
-# todo: expression not implement yet
-global int immutable_var = fake_expression;
+global int immutable_var = -42;
 global mut int mutable_var;
 
-fn test_fun(int[1] arg1, float[1][2] arg2, double[3][2][1] arg3) -> string
+fn test_fun(int[1] arg1, float[1][2] arg2, float[3][2][1] arg3) -> string
 {
-	fake_expression
+	pass
 }

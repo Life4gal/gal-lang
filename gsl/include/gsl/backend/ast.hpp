@@ -7,6 +7,8 @@
 #include <gsl/memory/memory.hpp>
 #include <gsl/utility/utility.hpp>
 
+#include <optional>
+
 namespace gal::gsl::ast
 {
 	using symbol_name = string::string;
@@ -26,6 +28,9 @@ namespace gal::gsl::ast
 	using expression_type = memory::shared_ptr<Expression>;
 	using module_type = memory::shared_ptr<Module>;
 
+	template<typename T, typename... Args>
+	[[nodiscard]] constexpr auto make(Args&&... args) -> memory::shared_ptr<T> { return memory::make_shared<T>(std::forward<Args>(args)...); }
+
 	class TypeDeclaration final
 	{
 	public:
@@ -37,7 +42,6 @@ namespace gal::gsl::ast
 			BOOLEAN,
 			INT,
 			FLOAT,
-			DOUBLE,
 			STRING,
 
 			STRUCTURE,
@@ -63,8 +67,8 @@ namespace gal::gsl::ast
 				dimension_container_type&& dimensions = {}
 				)
 			: type_{type},
-			owner_{owner},
-			dimensions_{std::move(dimensions)} {}
+			  owner_{owner},
+			  dimensions_{std::move(dimensions)} {}
 
 		[[nodiscard]] constexpr auto type() const noexcept -> variable_type { return type_; }
 	};
@@ -87,7 +91,7 @@ namespace gal::gsl::ast
 				variable_declaration&& declaration,
 				expression_type&& expression = nullptr)
 			: declaration_{std::move(declaration)},
-			expression_{std::move(expression)} {}
+			  expression_{std::move(expression)} {}
 
 		Variable(
 				symbol_name&& name,
@@ -171,8 +175,8 @@ namespace gal::gsl::ast
 				arguments_container_type&& arguments = {},
 				type_declaration_type&& return_type = {})
 			: name_{std::move(name)},
-			arguments_{std::move(arguments)},
-			return_type_{std::move(return_type)} {}
+			  arguments_{std::move(arguments)},
+			  return_type_{std::move(return_type)} {}
 
 		explicit Function(
 				const symbol_name_view name,
@@ -201,11 +205,171 @@ namespace gal::gsl::ast
 	class Expression
 	{
 	public:
-	private:
+		// todo
+		struct infer_type_context
+		{
+			module_type mod;
+			function_type function;
+			container::vector<variable_type> local_variables;
+		};
+
+	protected:
 		type_declaration_type type_;
+
+	public:
+		explicit Expression(type_declaration_type&& type)
+			: type_{std::move(type)} {}
+
+		// todo
+		Expression() = default;
 	};
 
-	// todo: EXPRESSIONS
+	class ExpressionNoop : public Expression
+	{
+		// todo: do nothing
+	};
+
+	class ExpressionOperator : public Expression
+	{
+	public:
+	protected:
+		function_type function_{nullptr};// always built-in function
+
+		ExpressionOperator() = default;
+	};
+
+	class ExpressionUnaryOperator : public ExpressionOperator
+	{
+	public:
+		enum class operand_type
+		{
+			// -x
+			NEGATE,
+			// ~x
+			BIT_COMPLEMENT,
+		};
+
+	private:
+		operand_type operand_;
+		expression_type rhs_;
+
+	public:
+		ExpressionUnaryOperator(
+				const operand_type operand,
+				expression_type&& rhs)
+			: operand_{operand},
+			  rhs_{std::move(rhs)} {}
+	};
+
+	class ExpressionBinaryOperator : public ExpressionOperator
+	{
+	public:
+		enum class operand_type
+		{
+			PLUS,
+			MINUS,
+			MULTIPLY,
+			DIVIDE,
+			POW,
+
+			BIT_AND,
+			BIT_OR,
+			BIT_XOR,
+
+			EQUAL,
+			GREATER_EQUAL,
+			GREATER,
+			LESS_EQUAL,
+			LESS,
+		};
+
+	private:
+		operand_type operand_;
+		expression_type lhs_;
+		expression_type rhs_;
+
+	public:
+		ExpressionBinaryOperator(
+				const operand_type operand,
+				expression_type&& lhs,
+				expression_type&& rhs
+				)
+			: operand_{operand},
+			  lhs_{std::move(lhs)},
+			  rhs_{std::move(rhs)} {}
+	};
+
+
+	class ExpressionConstant : public Expression
+	{
+	protected:
+		using Expression::Expression;
+	};
+
+	class ExpressionConstantBoolean : public ExpressionConstant
+	{
+	public:
+		using value_type = bool;
+
+	private:
+		value_type value_;
+
+	public:
+		explicit ExpressionConstantBoolean(const value_type value)
+			: value_{value} {}
+	};
+
+	class ExpressionConstantInt : public ExpressionConstant
+	{
+	public:
+		// todo: string?
+		using value_type = std::int64_t;
+
+	private:
+		value_type value_;
+
+	public:
+		explicit ExpressionConstantInt(const value_type value)
+			: value_{value} {}
+	};
+
+	class ExpressionConstantFloat : public ExpressionConstant
+	{
+	public:
+		// todo
+		using value_type = std::int64_t;
+		using fractional_type = std::optional<std::int64_t>;
+		using exponent_type = std::optional<std::int32_t>;
+
+	private:
+		value_type value_;
+		fractional_type fractional_;
+		exponent_type exponent_;
+
+	public:
+		explicit ExpressionConstantFloat(
+				const value_type value,
+				const fractional_type fractional = {},
+				const exponent_type exponent = {}
+				)
+			: value_{value},
+			  fractional_{fractional},
+			  exponent_{exponent} {}
+	};
+
+	class ExpressionConstantString : public ExpressionConstant
+	{
+	public:
+		using value_type = symbol_name;
+
+	private:
+		value_type value_;
+
+	public:
+		explicit ExpressionConstantString(
+				value_type&& value)
+			: value_{std::move(value)} {}
+	};
 
 	class Module : public memory::enable_shared_from_this<Module>
 	{

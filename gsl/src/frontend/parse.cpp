@@ -11,6 +11,7 @@
 
 #include <optional>
 #include <cstdio>
+#include <stdexcept>
 
 namespace
 {
@@ -47,8 +48,8 @@ namespace
 
 		ParseState(gsl::string::string&& filename, context_type&& buffer)
 			: filename{std::move(filename)},
-			buffer{std::move(buffer)},
-			buffer_anchor{this->buffer} {}
+			  buffer{std::move(buffer)},
+			  buffer_anchor{this->buffer} {}
 
 		auto report_invalid_identifier(const char_type* position, const symbol_name_view identifier, const char* category) const -> void
 		{
@@ -58,12 +59,12 @@ namespace
 			const lexy_ext::diagnostic_writer writer{buffer, {.flags = lexy::visualize_fancy}};
 
 			(void)writer.write_message(out,
-										lexy_ext::diagnostic_kind::error,
-										[&](lexy::cfile_output_iterator, lexy::visualization_options)
-										{
-											(void)std::fprintf(stderr, "unknown %s name '%s'", category, identifier.data());
-											return out;
-										});
+			                           lexy_ext::diagnostic_kind::error,
+			                           [&](lexy::cfile_output_iterator, lexy::visualization_options)
+			                           {
+				                           (void)std::fprintf(stderr, "unknown %s name '%s'", category, identifier.data());
+				                           return out;
+			                           });
 
 			if (!filename.empty()) { (void)writer.write_path(out, filename.c_str()); }
 
@@ -80,6 +81,36 @@ namespace
 					});
 		}
 
+		auto report_invalid_expression(const char_type* position, const symbol_name_view identifier, const char* category) const -> void
+		{
+			const auto location = lexy::get_input_location(buffer, position, buffer_anchor);
+
+			const auto out = lexy::cfile_output_iterator{stderr};
+			const lexy_ext::diagnostic_writer writer{buffer, {.flags = lexy::visualize_fancy}};
+
+			(void)writer.write_message(out,
+			                           lexy_ext::diagnostic_kind::error,
+			                           [&](lexy::cfile_output_iterator, lexy::visualization_options)
+			                           {
+				                           (void)std::fprintf(stderr, "invalid %s expression passed", category);
+				                           return out;
+			                           });
+
+			if (!filename.empty()) { (void)writer.write_path(out, filename.c_str()); }
+
+			(void)writer.write_empty_annotation(out);
+			(void)writer.write_annotation(
+					out,
+					lexy_ext::annotation_kind::primary,
+					location,
+					identifier.size(),
+					[&](lexy::cfile_output_iterator, lexy::visualization_options)
+					{
+						(void)std::fprintf(stderr, "for '%s'", identifier.data());
+						return out;
+					});
+		}
+
 		auto report_duplicate_declaration(const char_type* position, const symbol_name_view identifier, const char* category) const -> void
 		{
 			const auto location = lexy::get_input_location(buffer, position, buffer_anchor);
@@ -88,12 +119,12 @@ namespace
 			const lexy_ext::diagnostic_writer writer{buffer, {.flags = lexy::visualize_fancy}};
 
 			(void)writer.write_message(out,
-										lexy_ext::diagnostic_kind::error,
-										[&](lexy::cfile_output_iterator, lexy::visualization_options)
-										{
-											(void)std::fprintf(stderr, "duplicate %s declaration named '%s'", category, identifier.data());
-											return out;
-										});
+			                           lexy_ext::diagnostic_kind::error,
+			                           [&](lexy::cfile_output_iterator, lexy::visualization_options)
+			                           {
+				                           (void)std::fprintf(stderr, "duplicate %s declaration named '%s'", category, identifier.data());
+				                           return out;
+			                           });
 
 			if (!filename.empty()) { (void)writer.write_path(out, filename.c_str()); }
 
@@ -118,12 +149,12 @@ namespace
 			const lexy_ext::diagnostic_writer writer{buffer, {.flags = lexy::visualize_fancy}};
 
 			(void)writer.write_message(out,
-										lexy_ext::diagnostic_kind::warning,
-										[&](lexy::cfile_output_iterator, lexy::visualization_options)
-										{
-											(void)std::fprintf(stderr, "shadow %s declaration named '%s'", category, identifier.data());
-											return out;
-										});
+			                           lexy_ext::diagnostic_kind::warning,
+			                           [&](lexy::cfile_output_iterator, lexy::visualization_options)
+			                           {
+				                           (void)std::fprintf(stderr, "shadow %s declaration named '%s'", category, identifier.data());
+				                           return out;
+			                           });
 
 			if (!filename.empty()) { (void)writer.write_path(out, filename.c_str()); }
 
@@ -167,7 +198,7 @@ namespace grammar
 			using dimension_container_type = gsl::ast::TypeDeclaration::dimension_container_type;
 
 			constexpr static auto rule = dsl::list(dsl::lit_c<'['>//
-													>> (dsl::integer<dimension_type> + dsl::lit_c<']'>));
+			                                       >> (dsl::integer<dimension_type> + dsl::lit_c<']'>));
 
 			constexpr static auto value =
 					lexy::fold_inplace<dimension_container_type>(
@@ -203,8 +234,7 @@ namespace grammar
 						// builtin
 					}
 
-					// todo: make type?
-					return gsl::memory::make_shared<gsl::ast::TypeDeclaration>(
+					return gsl::ast::make<gsl::ast::TypeDeclaration>(
 							type,
 							target_structure.get(),
 							std::move(dimensions)
@@ -229,8 +259,7 @@ namespace grammar
 						// builtin
 					}
 
-					// todo: make type?
-					return gsl::memory::make_shared<gsl::ast::TypeDeclaration>(
+					return gsl::ast::make<gsl::ast::TypeDeclaration>(
 							type,
 							target_structure.get()
 							);
@@ -262,30 +291,359 @@ namespace grammar
 				);
 	};
 
-	struct expression
+	struct expression : public lexy::expression_production
 	{
+		struct expected_operand
+		{
+			static constexpr auto name = "expected operand";
+		};
+
+		// An expression that is nested inside another expression.
+		struct nested_expression : public lexy::transparent_production
+		{
+			// We change the whitespace rule to allow newlines:
+			// as it's nested, the REPL can properly handle continuation lines.
+			constexpr static auto whitespace = dsl::ascii::space | dsl::backslash >> dsl::newline;
+
+			constexpr static auto rule = dsl::recurse<expression>;
+
+			constexpr static auto value = lexy::forward<gsl::ast::expression_type>;
+		};
+
+		struct noop
+		{
+			constexpr static auto rule = LEXY_LIT("pass");
+
+			constexpr static auto value = lexy::callback<gsl::ast::expression_type>(
+					[]() -> gsl::ast::expression_type { return gsl::ast::make<gsl::ast::ExpressionNoop>(); });
+		};
+
+		// ================================
+		// =============literal===============
+		// ================================
+
+		struct literal_bool : public lexy::token_production
+		{
+			using value_type = gsl::ast::ExpressionConstantBoolean::value_type;
+
+			struct literal_true : public lexy::transparent_production
+			{
+				constexpr static auto rule = LEXY_LIT("true");
+				constexpr static auto value = lexy::constant(value_type{true});
+			};
+
+			struct literal_false : public lexy::transparent_production
+			{
+				constexpr static auto rule = LEXY_LIT("false");
+				constexpr static auto value = lexy::constant(value_type{false});
+			};
+
+			constexpr static auto rule = dsl::p<literal_true> | dsl::p<literal_false>;
+			constexpr static auto value = lexy::callback<gsl::ast::expression_type>(
+					[](const value_type value) -> gsl::ast::expression_type { return gsl::ast::make<gsl::ast::ExpressionConstantBoolean>(value); }
+					);
+		};
+
+		struct literal_int : public lexy::token_production
+		{
+			using value_type = gsl::ast::ExpressionConstantInt::value_type;
+
+			constexpr static auto rule = LEXY_LIT("0x") >> dsl::integer<value_type, dsl::hex> | dsl::integer<value_type>;
+			constexpr static auto value =
+					lexy::callback<gsl::ast::expression_type>(
+							[](const value_type value) -> gsl::ast::expression_type { return gsl::ast::make<gsl::ast::ExpressionConstantInt>(value); });
+		};
+
+		struct literal_float : public lexy::token_production
+		{
+			using value_type = gsl::ast::ExpressionConstantFloat::value_type;
+			using fractional_type = gsl::ast::ExpressionConstantFloat::fractional_type::value_type;
+			using exponent_type = gsl::ast::ExpressionConstantFloat::exponent_type::value_type;
+
+			struct value_part : public lexy::transparent_production
+			{
+				constexpr static auto rule = dsl::minus_sign + dsl::integer<value_type>(dsl::digits<>.no_leading_zero());
+				constexpr static auto value = lexy::as_integer<value_type>;
+			};
+
+			struct fractional_part : public lexy::transparent_production
+			{
+				constexpr static auto rule = dsl::lit_c<'.'>//
+				                             >> dsl::integer<value_type>(dsl::digits<>.no_leading_zero());
+				constexpr static auto value = lexy::as_integer<fractional_type>;
+			};
+
+			struct exponent_part : public lexy::transparent_production
+			{
+				constexpr static auto rule = (dsl::lit_c<'e'> | dsl::lit_c<'E'>) >> (dsl::sign + dsl::integer<exponent_type>);
+				constexpr static auto value = lexy::as_integer<exponent_type>;
+			};
+
+			constexpr static auto rule = dsl::peek(dsl::lit_c<'-'> / dsl::digit<>)//
+			                             >> (dsl::p<value_part> + dsl::opt(dsl::p<fractional_part>) + dsl::opt(dsl::p<exponent_part>));
+			constexpr static auto value = lexy::callback<gsl::ast::expression_type>(
+					[](
+					const gsl::ast::ExpressionConstantFloat::value_type& value,
+					const gsl::ast::ExpressionConstantFloat::fractional_type& fractional,
+					const gsl::ast::ExpressionConstantFloat::exponent_type& exponent) -> gsl::ast::expression_type
+					{
+						return gsl::ast::make<gsl::ast::ExpressionConstantFloat>(value, fractional, exponent);
+					});
+		};
+
+		struct literal_string : public lexy::token_production
+		{
+			using value_type = gsl::ast::ExpressionConstantString::value_type;
+
+			struct value_part : public lexy::transparent_production
+			{
+				constexpr static auto rule = dsl::quoted(
+						// all printable unicode characters in single quotation marks
+						dsl::unicode::print);
+
+				constexpr static auto value = lexy::as_string<value_type>;
+			};
+
+			constexpr static auto rule = dsl::p<value_part>;
+
+			constexpr static auto value = lexy::callback<gsl::ast::expression_type>(
+					[](value_type&& value) -> gsl::ast::expression_type { return gsl::ast::make<gsl::ast::ExpressionConstantString>(std::move(value)); });
+		};
+
+		// We need to specify the atomic part of an expression.
 		// todo
-		constexpr static auto rule = dsl::p<identifier>;
+		constexpr static auto atom = []
+		{
+			constexpr auto paren_expression = dsl::parenthesized(dsl::p<nested_expression>);
+			// todo: function call?
+
+			constexpr auto literals = dsl::p<literal_bool> | dsl::p<literal_int> | dsl::p<literal_float> | dsl::p<literal_string>;
+
+			return
+					dsl::position +
+					(paren_expression |
+					 literals |
+					 dsl::p<noop> |
+					 dsl::error<expected_operand>);
+		}();
+
+		// ================================
+		// ==========unary operator============
+		// ================================
+
+		// ~x
+		struct unary_bit_complement : public dsl::prefix_op
+		{
+			constexpr static auto op = dsl::op<gsl::ast::ExpressionUnaryOperator::operand_type::BIT_COMPLEMENT>(LEXY_LIT("~"));
+			using operand = dsl::atom;
+		};
+
+		// -x
+		struct unary_negate : public dsl::prefix_op
+		{
+			constexpr static auto op = dsl::op<gsl::ast::ExpressionUnaryOperator::operand_type::NEGATE>(LEXY_LIT("-"));
+			using operand = dsl::atom;
+		};
+
+		// ================================
+		// ==========binary operator============
+		// ================================
+
+		// x ** x
+		struct binary_power : public dsl::infix_op_left// todo: left or right?
+		{
+			constexpr static auto op = dsl::op<gsl::ast::ExpressionBinaryOperator::operand_type::POW>(LEXY_LIT("**"));
+			using operand = dsl::atom;
+		};
+
+		// x * x
+		struct binary_multiply : public dsl::infix_op_left
+		{
+			// Since we have both ** and * as possible operators, we need to ensure that * is only
+			// matched when it is not followed by *.
+			// In the particular situation where ** has higher binding power, it doesn't actually
+			// matter here, but it's better to be more resilient.
+			constexpr static auto op = dsl::op<gsl::ast::ExpressionBinaryOperator::operand_type::MULTIPLY>(dsl::not_followed_by(LEXY_LIT("*"), LEXY_LIT("*")));
+			using operand = binary_power;
+		};
+
+		// x / x
+		struct binary_divide : public dsl::infix_op_left
+		{
+			constexpr static auto op = dsl::op<gsl::ast::ExpressionBinaryOperator::operand_type::DIVIDE>(LEXY_LIT("/"));
+			using operand = binary_multiply;
+		};
+
+		// x + x
+		struct binary_plus : public dsl::infix_op_left
+		{
+			constexpr static auto op = dsl::op<gsl::ast::ExpressionBinaryOperator::operand_type::PLUS>(LEXY_LIT("+"));
+			using operand = binary_divide;
+		};
+
+		// x - x
+		struct binary_minus : public dsl::infix_op_left
+		{
+			constexpr static auto op = dsl::op<gsl::ast::ExpressionBinaryOperator::operand_type::MINUS>(LEXY_LIT("-"));
+			using operand = binary_plus;
+		};
+
+		// x & x
+		struct binary_bit_and : public dsl::infix_op_left
+		{
+			constexpr static auto op = dsl::op<gsl::ast::ExpressionBinaryOperator::operand_type::BIT_AND>(LEXY_LIT("&"));
+			using operand = unary_bit_complement;
+		};
+
+		// x | x
+		struct binary_bit_or : public dsl::infix_op_left
+		{
+			constexpr static auto op = dsl::op<gsl::ast::ExpressionBinaryOperator::operand_type::BIT_OR>(LEXY_LIT("|"));
+			using operand = binary_bit_and;
+		};
+
+		// x ^ x
+		struct binary_bit_xor : public dsl::infix_op_left
+		{
+			constexpr static auto op = dsl::op<gsl::ast::ExpressionBinaryOperator::operand_type::BIT_XOR>(LEXY_LIT("^"));
+			using operand = binary_bit_and;
+		};
+
+		// x == y / x >= y / x > y / x <= y / x < y
+		// struct binary_comparison : public dsl::infix_op_list
+		// {
+		// private:
+		// 	using enum gsl::ast::ExpressionBinaryOperator::operand_type;
+		// public:
+		// 	constexpr static auto op =
+		// 			dsl::op<EQUAL>(LEXY_LIT("==")) /
+		// 			dsl::op<GREATER_EQUAL>(LEXY_LIT(">=")) /
+		// 			dsl::op<GREATER>(dsl::not_followed_by(LEXY_LIT(">"), LEXY_LIT("="))) /
+		// 			dsl::op<LESS_EQUAL>(LEXY_LIT("<=")) /
+		// 			dsl::op<LESS>(dsl::not_followed_by(LEXY_LIT("<"), LEXY_LIT("=")));
+		//
+		// 	// The use of dsl::groups ensures that an expression can either contain
+		// 	// mathematical or bit operators.
+		// 	// Mixing requires parenthesis.
+		// 	using operand = dsl::groups<
+		// 		// the lowest priority mathematical operation
+		// 		binary_minus,
+		// 		// the lowest priority bit operation
+		// 		binary_bit_xor>;
+		// };
+
+		// todo: x ? y : z
+		// struct ternary_conditional : public dsl::infix_op_single
+		// {
+		// 	// We treat a conditional operator, which has three operands,
+		// 	// as a binary operator where the operator consists of ?, the inner operator, and :.
+		// 	// The <void> ensures that `dsl::op` does not produce a value.
+		// 	constexpr static auto op = dsl::op<void>(LEXY_LIT("?") >> dsl::p<nested_expression> + dsl::lit_c<':'>);
+		// 	using operand = binary_comparison;
+		// };
+
+		// x = y
+		// struct assignment : public dsl::infix_op_single
+		// {
+		// 	// Similar to * above, we need to prevent `=` from matching `==`.
+		// 	constexpr static auto op = dsl::op<void>(dsl::not_followed_by(LEXY_LIT("="), LEXY_LIT("=")));
+		// 	// using operand = ternary_conditional;
+		// 	using operand = binary_comparison;
+		// };
+
+		// An expression also needs to specify the operation with the lowest binding power.
+		// The operation of everything else is determined by following the `::operand` member.
+		// using operation = assignment;
+		// using operation = binary_comparison;
+		using operation = binary_bit_xor;
 
 		// todo
 		constexpr static auto value = ParseState::callback<gsl::ast::expression_type>(
-				[](const ParseState& state, symbol_name&&) -> gsl::ast::expression_type
+				// atom
+				[](const ParseState& state, const ParseState::char_type* position, gsl::ast::expression_type&& expression) -> gsl::ast::expression_type
 				{
-					(void)state;
-					return gsl::memory::make_shared<gsl::ast::Expression>();
-				});
+					// todo
+					if (!expression) { state.report_invalid_expression(position, "expression", "expression"); }
+
+					return expression;
+				},
+				// ================================
+				// ==========unary operator============
+				// ================================
+				[]([[maybe_unused]] const ParseState& state, lexy::op<unary_bit_complement::op>, gsl::ast::expression_type&& expression) -> gsl::ast::expression_type { return gsl::ast::make<gsl::ast::ExpressionUnaryOperator>(gsl::ast::ExpressionUnaryOperator::operand_type::BIT_COMPLEMENT, std::move(expression)); },
+				[]([[maybe_unused]] const ParseState& state, lexy::op<unary_negate::op>, gsl::ast::expression_type&& expression) -> gsl::ast::expression_type { return gsl::ast::make<gsl::ast::ExpressionUnaryOperator>(gsl::ast::ExpressionUnaryOperator::operand_type::NEGATE, std::move(expression)); },
+				// ================================
+				// ==========binary operator============
+				// ================================
+				[]([[maybe_unused]] const ParseState& state, gsl::ast::expression_type&& lhs, lexy::op<binary_power::op>, gsl::ast::expression_type&& rhs) -> gsl::ast::expression_type
+				{
+					return gsl::ast::make<gsl::ast::ExpressionBinaryOperator>(
+							gsl::ast::ExpressionBinaryOperator::operand_type::POW,
+							std::move(lhs),
+							std::move(rhs));
+				},
+				[]([[maybe_unused]] const ParseState& state, gsl::ast::expression_type&& lhs, lexy::op<binary_multiply::op>, gsl::ast::expression_type&& rhs) -> gsl::ast::expression_type
+				{
+					return gsl::ast::make<gsl::ast::ExpressionBinaryOperator>(
+							gsl::ast::ExpressionBinaryOperator::operand_type::MULTIPLY,
+							std::move(lhs),
+							std::move(rhs));
+				},
+				[]([[maybe_unused]] const ParseState& state, gsl::ast::expression_type&& lhs, lexy::op<binary_divide::op>, gsl::ast::expression_type&& rhs) -> gsl::ast::expression_type
+				{
+					return gsl::ast::make<gsl::ast::ExpressionBinaryOperator>(
+							gsl::ast::ExpressionBinaryOperator::operand_type::DIVIDE,
+							std::move(lhs),
+							std::move(rhs));
+				},
+				[]([[maybe_unused]] const ParseState& state, gsl::ast::expression_type&& lhs, lexy::op<binary_plus::op>, gsl::ast::expression_type&& rhs) -> gsl::ast::expression_type
+				{
+					return gsl::ast::make<gsl::ast::ExpressionBinaryOperator>(
+							gsl::ast::ExpressionBinaryOperator::operand_type::PLUS,
+							std::move(lhs),
+							std::move(rhs));
+				},
+				[]([[maybe_unused]] const ParseState& state, gsl::ast::expression_type&& lhs, lexy::op<binary_minus::op>, gsl::ast::expression_type&& rhs) -> gsl::ast::expression_type
+				{
+					return gsl::ast::make<gsl::ast::ExpressionBinaryOperator>(
+							gsl::ast::ExpressionBinaryOperator::operand_type::MINUS,
+							std::move(lhs),
+							std::move(rhs));
+				},
+				[]([[maybe_unused]] const ParseState& state, gsl::ast::expression_type&& lhs, lexy::op<binary_bit_and::op>, gsl::ast::expression_type&& rhs) -> gsl::ast::expression_type
+				{
+					return gsl::ast::make<gsl::ast::ExpressionBinaryOperator>(
+							gsl::ast::ExpressionBinaryOperator::operand_type::BIT_AND,
+							std::move(lhs),
+							std::move(rhs));
+				},
+				[]([[maybe_unused]] const ParseState& state, gsl::ast::expression_type&& lhs, lexy::op<binary_bit_or::op>, gsl::ast::expression_type&& rhs) -> gsl::ast::expression_type
+				{
+					return gsl::ast::make<gsl::ast::ExpressionBinaryOperator>(
+							gsl::ast::ExpressionBinaryOperator::operand_type::BIT_OR,
+							std::move(lhs),
+							std::move(rhs));
+				},
+				[]([[maybe_unused]] const ParseState& state, gsl::ast::expression_type&& lhs, lexy::op<binary_bit_xor::op>, gsl::ast::expression_type&& rhs) -> gsl::ast::expression_type
+				{
+					return gsl::ast::make<gsl::ast::ExpressionBinaryOperator>(
+							gsl::ast::ExpressionBinaryOperator::operand_type::BIT_XOR,
+							std::move(lhs),
+							std::move(rhs));
+				}
+				);
 	};
 
 	struct variable_declaration_with_assignment
 	{
-		constexpr static auto rule = dsl::p<variable_declaration> + dsl::equal_sign + dsl::p<expression>;
+		constexpr static auto rule = dsl::p<variable_declaration> + dsl::equal_sign + dsl::position + dsl::p<expression>;
 
 		constexpr static auto value = ParseState::callback<gsl::ast::variable_type>(
-				[](const ParseState& state, gsl::ast::Variable::variable_declaration&& variable_declaration, gsl::ast::expression_type&& expression) -> gsl::ast::variable_type
+				[](const ParseState& state, gsl::ast::Variable::variable_declaration&& variable_declaration, const ParseState::char_type* position, gsl::ast::expression_type&& expression) -> gsl::ast::variable_type
 				{
-					(void)state;
-					// todo: make variable?
-					return gsl::memory::make_shared<gsl::ast::Variable>(
+					if (!expression) { state.report_invalid_expression(position, variable_declaration.name, "variable"); }
+
+					return gsl::ast::make<gsl::ast::Variable>(
 							std::move(variable_declaration),
 							std::move(expression)
 							);
@@ -294,15 +652,15 @@ namespace grammar
 
 	struct variable_declaration_with_optional_assign
 	{
-		constexpr static auto rule = dsl::p<variable_declaration> + dsl::opt(dsl::equal_sign >> dsl::p<expression>);
+		constexpr static auto rule = dsl::p<variable_declaration> + dsl::opt(dsl::equal_sign >> dsl::position + dsl::p<expression>);
 
 		constexpr static auto value = ParseState::callback<gsl::ast::variable_type>(
 				// with assignment
-				[](const ParseState& state, gsl::ast::Variable::variable_declaration&& variable_declaration, gsl::ast::expression_type&& expression) -> gsl::ast::variable_type
+				[](const ParseState& state, gsl::ast::Variable::variable_declaration&& variable_declaration, const ParseState::char_type* position, gsl::ast::expression_type&& expression) -> gsl::ast::variable_type
 				{
-					(void)state;
-					// todo: make variable?
-					return gsl::memory::make_shared<gsl::ast::Variable>(
+					if (!expression) { state.report_invalid_expression(position, variable_declaration.name, "variable"); }
+
+					return gsl::ast::make<gsl::ast::Variable>(
 							std::move(variable_declaration),
 							std::move(expression));
 				},
@@ -310,8 +668,7 @@ namespace grammar
 				[](const ParseState& state, gsl::ast::Variable::variable_declaration&& variable_declaration, lexy::nullopt) -> gsl::ast::variable_type
 				{
 					(void)state;
-					// todo: make variable?
-					return gsl::memory::make_shared<gsl::ast::Variable>(std::move(variable_declaration));
+					return gsl::ast::make<gsl::ast::Variable>(std::move(variable_declaration));
 				});
 	};
 
@@ -353,8 +710,8 @@ namespace grammar
 		constexpr static auto rule =
 				LEXY_KEYWORD("struct", identifier::rule) >>
 				(dsl::p<header> +
-				// todo: forward declaration?
-				dsl::curly_bracketed.opt_list(dsl::p<field>));
+				 // todo: forward declaration?
+				 dsl::curly_bracketed.opt_list(dsl::p<field>));
 
 		constexpr static auto value = lexy::forward<void>;
 	};
@@ -371,7 +728,7 @@ namespace grammar
 			{
 				// mut [type variable] = expression
 				// immutable variable should have initializer
-				return LEXY_KEYWORD("mut", identifier::rule) >> dsl::position + dsl::p<variable_declaration_with_optional_assign>;
+				return LEXY_KEYWORD("mut", identifier::rule) >> (dsl::position + dsl::p<variable_declaration_with_optional_assign>);
 			}();
 
 			constexpr static auto value = ParseState::callback<void>(
@@ -383,7 +740,8 @@ namespace grammar
 
 						// register succeeded, reset the pointer
 						// Note: if the global variables are duplicate defined, the original global variables will be overwritten
-						v.swap(variable);
+						// todo: better swap?
+						*v = std::move(*variable);
 					});
 		};
 
@@ -395,7 +753,7 @@ namespace grammar
 			{
 				// [type variable] [= expression]
 				// mutable variable may not have initializer
-				return dsl::else_ >> dsl::position + dsl::p<variable_declaration_with_assignment>;
+				return dsl::else_ >> (dsl::position + dsl::p<variable_declaration_with_assignment>);
 			}();
 
 			static constexpr auto value = ParseState::callback<void>(
@@ -407,16 +765,17 @@ namespace grammar
 
 						// register succeeded, reset the pointer
 						// Note: if the global variables are duplicate defined, the original global variables will be overwritten
-						v.swap(variable);
+						// todo: better swap?
+						*v = std::move(*variable);
 					}
 					);
 		};
 
 		constexpr static auto rule =
 				LEXY_KEYWORD("global", identifier::rule) >>
-				(dsl::p<mutable_global> | dsl::p<immutable_global>) +
-				// semicolon required ?
-				dsl::semicolon;
+				((dsl::p<mutable_global> | dsl::p<immutable_global>) +
+				 // semicolon required ?
+				 dsl::semicolon);
 
 		constexpr static auto value = lexy::forward<void>;
 	};
@@ -492,19 +851,24 @@ namespace grammar
 
 		struct body
 		{
-			constexpr static auto rule = dsl::curly_bracketed.open() >> dsl::p<expression> + dsl::curly_bracketed.close();
+			constexpr static auto rule = dsl::curly_bracketed.open() >> (dsl::position + dsl::p<expression> + dsl::curly_bracketed.close());
 
 			constexpr static auto value = ParseState::callback<void>(
-					[](const ParseState& state, gsl::ast::expression_type&& body) -> void { state.current_function->set_function_body(std::move(body)); }
+					[](const ParseState& state, const ParseState::char_type* position, gsl::ast::expression_type&& body) -> void
+					{
+						if (!body) { state.report_invalid_expression(position, state.current_function->get_name(), "function body"); }
+
+						state.current_function->set_function_body(std::move(body));
+					}
 					);
 		};
 
 		constexpr static auto rule =
 				LEXY_KEYWORD("fn", identifier::rule) >>
 				// function declaration
-				dsl::p<header> +
-				// function body
-				dsl::p<body>;
+				(dsl::p<header> +
+				 // function body
+				 dsl::p<body>);
 
 		constexpr static auto value = lexy::forward<void>;
 	};
@@ -532,11 +896,7 @@ namespace grammar
 					dsl::semicolon;
 
 			constexpr static auto value = ParseState::callback<void>(
-					[](ParseState& state, symbol_name&& symbol) -> void
-					{
-						// todo: make module?
-						state.mod = gsl::memory::make_shared<gsl::ast::Module>(std::move(symbol));
-					});
+					[](ParseState& state, symbol_name&& symbol) -> void { state.mod = gsl::ast::make<gsl::ast::Module>(std::move(symbol)); });
 		};
 
 		constexpr static auto rule =
@@ -559,7 +919,7 @@ namespace gal::gsl::frontend
 		if (!file)
 		{
 			// todo
-			throw std::exception{"Cannot read file!"};
+			throw std::runtime_error{"Cannot read file!"};
 		}
 
 		ParseState state{string::string{filename}, std::move(file).buffer()};
@@ -568,7 +928,7 @@ namespace gal::gsl::frontend
 			!result.is_success())
 		{
 			// todo: handle it?
-			throw std::exception{"Cannot parse file!"};
+			throw std::runtime_error{"Cannot parse file!"};
 		}
 
 		return state.mod;
