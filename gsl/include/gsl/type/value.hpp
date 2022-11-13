@@ -117,4 +117,23 @@ namespace gal::gsl::type
 			return *static_cast<const T*>(data.raw_observer);
 		}
 	};
+
+	// Explicitly instantiate some commonly used transformations
+	template<>
+	class ValueCaster<std::int64_t> : public value_caster_specified
+	{
+	public:
+		constexpr static auto from(const std::int64_t data) -> Value { return Value{.signed_integer_64 = {data, 0}}; }
+
+		constexpr static auto to(const Value& data) -> decltype(auto) { return data.signed_integer_64[0]; }
+	};
+
+	template<>
+	class ValueCaster<double> : public value_caster_specified
+	{
+	public:
+		constexpr static auto from(const double data) -> Value { return Value{.double_precision = {data, 0}}; }
+
+		constexpr static auto to(const Value& data) -> decltype(auto) { return data.double_precision[0]; }
+	};
 }// namespace gal::gsl::core
