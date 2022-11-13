@@ -8,11 +8,20 @@
 #include <gsl/utility/utility.hpp>
 
 #include <optional>
+#include <ranges>
+
+namespace gal::gsl::simulate
+{
+	class SimulateNode;
+	class SimulateContext;
+}
 
 namespace gal::gsl::ast
 {
 	using symbol_name = string::string;
 	using symbol_name_view = std::string_view;
+
+	class Visitor;
 
 	class TypeDeclaration;
 	class Variable;
@@ -30,6 +39,23 @@ namespace gal::gsl::ast
 
 	template<typename T, typename... Args>
 	[[nodiscard]] constexpr auto make(Args&&... args) -> memory::shared_ptr<T> { return memory::make_shared<T>(std::forward<Args>(args)...); }
+
+	class Visitor
+	{
+	public:
+		using string_view_type = string::string_view;
+
+		Visitor() = default;
+		Visitor(const Visitor&) = delete;
+		Visitor& operator=(const Visitor&) = delete;
+		Visitor(Visitor&&) noexcept = default;
+		Visitor& operator=(Visitor&&) noexcept = default;
+		virtual ~Visitor() noexcept = default;
+
+		virtual void log(string_view_type message) = 0;
+
+		virtual void visit(const Expression& expression) = 0;
+	};
 
 	class TypeDeclaration final
 	{
@@ -59,18 +85,29 @@ namespace gal::gsl::ast
 		Structure* owner_;
 		// type[1][2][3][4]...
 		dimension_container_type dimensions_;
+		bool is_reference_;
 
 	public:
 		explicit TypeDeclaration(
 				const variable_type type = variable_type::VOID,
 				Structure* owner = nullptr,
-				dimension_container_type&& dimensions = {}
+				dimension_container_type&& dimensions = {},
+				const bool is_reference = false
 				)
 			: type_{type},
 			  owner_{owner},
-			  dimensions_{std::move(dimensions)} {}
+			  dimensions_{std::move(dimensions)},
+			  is_reference_{is_reference} {}
 
 		[[nodiscard]] constexpr auto type() const noexcept -> variable_type { return type_; }
+
+		[[nodiscard]] auto type_name() const noexcept -> symbol_name_view;
+
+		[[nodiscard]] constexpr auto dimensions() const noexcept { return dimensions_ | std::views::all; }
+
+		[[nodiscard]] constexpr auto is_reference() const noexcept { return is_reference_; }
+
+		void log(Visitor& visitor) const;
 	};
 
 	class Variable final
@@ -115,9 +152,13 @@ namespace gal::gsl::ast
 		explicit Variable(const symbol_name_view name)
 			: Variable{name, {}} {}
 
-		[[nodiscard]] auto get_name() const noexcept -> symbol_name_view { return declaration_.name; }
+		[[nodiscard]] constexpr auto get_declaration() const noexcept -> const variable_declaration& { return declaration_; }
+
+		[[nodiscard]] constexpr auto get_name() const noexcept -> symbol_name_view { return declaration_.name; }
 
 		[[nodiscard]] auto get_type() const noexcept -> type_declaration_type { return declaration_.type; }
+
+		[[nodiscard]] auto get_expression() const noexcept -> expression_type { return expression_; }
 
 		auto set_type(type_declaration_type&& type) -> void { declaration_.type = std::move(type); }
 		auto set_type(const type_declaration_type& type) -> void { declaration_.type = type; }
@@ -150,12 +191,16 @@ namespace gal::gsl::ast
 
 		[[nodiscard]] auto get_name() const -> symbol_name_view { return name_; }
 
+		[[nodiscard]] constexpr auto fields() const noexcept { return fields_ | std::views::all; }
+
 		// this functions do not move from rvalue arguments if the insertion does not happen
 		auto register_field(symbol_name&& name, type_declaration_type&& type) -> bool;
 		// this functions do not move from rvalue arguments if the insertion does not happen
 		auto register_field(Variable::variable_declaration&& variable) -> bool;
 
 		auto register_field(symbol_name_view name, const type_declaration_type& type) -> bool;
+
+		void log(Visitor& visitor) const;
 	};
 
 	class Function
@@ -193,13 +238,28 @@ namespace gal::gsl::ast
 
 		[[nodiscard]] constexpr virtual auto is_builtin() const noexcept -> bool { return false; }
 
-		[[nodiscard]] auto get_name() const -> symbol_name_view { return name_; }
+		[[nodiscard]] constexpr auto get_name() const -> symbol_name_view { return name_; }
+
+		[[nodiscard]] constexpr auto get_arguments() const noexcept
+		{
+			return arguments_ |
+			       std::views::all |
+			       std::views::transform([](const auto& argument) -> const Variable& { return *argument; });
+		}
+
+		[[nodiscard]] auto get_return_type() const noexcept -> type_declaration_type { return return_type_; }
+
+		[[nodiscard]] auto get_function_body() const noexcept -> expression_type { return function_body_; }
 
 		auto set_arguments(arguments_container_type&& arguments) -> void { arguments_ = std::move(arguments); }
 
 		auto set_return_type(type_declaration_type return_type) -> void { return_type_ = std::move(return_type); }
 
 		auto set_function_body(expression_type&& function_body) -> void { function_body_ = std::move(function_body); }
+
+		void log(Visitor& visitor) const;
+
+		virtual auto make_simulate_node(simulate::SimulateContext& context) -> simulate::SimulateNode*;
 	};
 
 	class Expression
@@ -216,17 +276,36 @@ namespace gal::gsl::ast
 	protected:
 		type_declaration_type type_;
 
-	public:
 		explicit Expression(type_declaration_type&& type)
 			: type_{std::move(type)} {}
 
-		// todo
+		// todo: empty?
 		Expression() = default;
+
+		Expression(const Expression&) = delete;
+		Expression& operator=(const Expression&) = delete;
+		Expression(Expression&&) noexcept = default;
+		Expression& operator=(Expression&&) noexcept = default;
+
+		virtual ~Expression() noexcept = default;
+
+	public:
+		[[nodiscard]] virtual auto simulate(simulate::SimulateContext& context) const -> simulate::SimulateNode* = 0;
+
+		[[nodiscard]] virtual auto deep_copy_from_this(expression_type dest) const -> expression_type;
+		[[nodiscard]] virtual auto deep_copy_from_this() const -> expression_type;
+
+		virtual void visit(Visitor& visitor) const { visitor.visit(*this); }
 	};
 
-	class ExpressionNoop : public Expression
+	class ExpressionNoop final : public Expression
 	{
-		// todo: do nothing
+		auto simulate(simulate::SimulateContext& context) const -> simulate::SimulateNode* override
+		{
+			// todo
+			(void)context;
+			return nullptr;
+		}
 	};
 
 	class ExpressionOperator : public Expression
@@ -236,9 +315,13 @@ namespace gal::gsl::ast
 		function_type function_{nullptr};// always built-in function
 
 		ExpressionOperator() = default;
+
+	public:
+		[[nodiscard]] auto deep_copy_from_this(expression_type dest) const -> expression_type override;
+		[[nodiscard]] auto deep_copy_from_this() const -> expression_type override;
 	};
 
-	class ExpressionUnaryOperator : public ExpressionOperator
+	class ExpressionUnaryOperator final : public ExpressionOperator
 	{
 	public:
 		enum class operand_type
@@ -247,6 +330,8 @@ namespace gal::gsl::ast
 			NEGATE,
 			// ~x
 			BIT_COMPLEMENT,
+			// !x
+			LOGICAL_NOT
 		};
 
 	private:
@@ -259,9 +344,17 @@ namespace gal::gsl::ast
 				expression_type&& rhs)
 			: operand_{operand},
 			  rhs_{std::move(rhs)} {}
+
+		// todo: invalid
+		ExpressionUnaryOperator() = default;
+
+		auto simulate(simulate::SimulateContext& context) const -> simulate::SimulateNode* override;
+
+		[[nodiscard]] auto deep_copy_from_this(expression_type dest) const -> expression_type override;
+		[[nodiscard]] auto deep_copy_from_this() const -> expression_type override;
 	};
 
-	class ExpressionBinaryOperator : public ExpressionOperator
+	class ExpressionBinaryOperator final : public ExpressionOperator
 	{
 	public:
 		enum class operand_type
@@ -297,6 +390,14 @@ namespace gal::gsl::ast
 			: operand_{operand},
 			  lhs_{std::move(lhs)},
 			  rhs_{std::move(rhs)} {}
+
+		// todo: invalid
+		ExpressionBinaryOperator() = default;
+
+		auto simulate(simulate::SimulateContext& context) const -> simulate::SimulateNode* override;
+
+		[[nodiscard]] auto deep_copy_from_this(expression_type dest) const -> expression_type override;
+		[[nodiscard]] auto deep_copy_from_this() const -> expression_type override;
 	};
 
 
@@ -306,20 +407,7 @@ namespace gal::gsl::ast
 		using Expression::Expression;
 	};
 
-	class ExpressionConstantBoolean : public ExpressionConstant
-	{
-	public:
-		using value_type = bool;
-
-	private:
-		value_type value_;
-
-	public:
-		explicit ExpressionConstantBoolean(const value_type value)
-			: value_{value} {}
-	};
-
-	class ExpressionConstantInt : public ExpressionConstant
+	class ExpressionConstantInt final : public ExpressionConstant
 	{
 	public:
 		// todo: string?
@@ -329,11 +417,16 @@ namespace gal::gsl::ast
 		value_type value_;
 
 	public:
-		explicit ExpressionConstantInt(const value_type value)
+		explicit ExpressionConstantInt(const value_type value = {})
 			: value_{value} {}
+
+		auto simulate(simulate::SimulateContext& context) const -> simulate::SimulateNode* override;
+
+		[[nodiscard]] auto deep_copy_from_this(expression_type dest) const -> expression_type override;
+		[[nodiscard]] auto deep_copy_from_this() const -> expression_type override;
 	};
 
-	class ExpressionConstantFloat : public ExpressionConstant
+	class ExpressionConstantFloat final : public ExpressionConstant
 	{
 	public:
 		// todo
@@ -348,16 +441,21 @@ namespace gal::gsl::ast
 
 	public:
 		explicit ExpressionConstantFloat(
-				const value_type value,
+				const value_type value = {},
 				const fractional_type fractional = {},
 				const exponent_type exponent = {}
 				)
 			: value_{value},
 			  fractional_{fractional},
 			  exponent_{exponent} {}
+
+		auto simulate(simulate::SimulateContext& context) const -> simulate::SimulateNode* override;
+
+		[[nodiscard]] auto deep_copy_from_this(expression_type dest) const -> expression_type override;
+		[[nodiscard]] auto deep_copy_from_this() const -> expression_type override;
 	};
 
-	class ExpressionConstantString : public ExpressionConstant
+	class ExpressionConstantString final : public ExpressionConstant
 	{
 	public:
 		using value_type = symbol_name;
@@ -367,11 +465,16 @@ namespace gal::gsl::ast
 
 	public:
 		explicit ExpressionConstantString(
-				value_type&& value)
+				value_type&& value = {})
 			: value_{std::move(value)} {}
+
+		auto simulate(simulate::SimulateContext& context) const -> simulate::SimulateNode* override;
+
+		[[nodiscard]] auto deep_copy_from_this(expression_type dest) const -> expression_type override;
+		[[nodiscard]] auto deep_copy_from_this() const -> expression_type override;
 	};
 
-	class Module : public memory::enable_shared_from_this<Module>
+	class Module final : public memory::enable_shared_from_this<Module>
 	{
 	public:
 		template<typename T>
