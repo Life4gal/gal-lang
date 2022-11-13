@@ -9,6 +9,12 @@
 #include <lexy/callback.hpp>
 #include <lexy/visualize.hpp>
 
+#define GSL_PARSE_AS_TREE
+
+#ifdef GSL_PARSE_AS_TREE
+#include <lexy/action/parse_as_tree.hpp>
+#endif
+
 #include <optional>
 #include <cstdio>
 #include <stdexcept>
@@ -324,23 +330,21 @@ namespace grammar
 
 		struct literal_bool : public lexy::token_production
 		{
-			using value_type = gsl::ast::ExpressionConstantBoolean::value_type;
-
 			struct literal_true : public lexy::transparent_production
 			{
 				constexpr static auto rule = LEXY_LIT("true");
-				constexpr static auto value = lexy::constant(value_type{true});
+				constexpr static auto value = lexy::constant(true);
 			};
 
 			struct literal_false : public lexy::transparent_production
 			{
 				constexpr static auto rule = LEXY_LIT("false");
-				constexpr static auto value = lexy::constant(value_type{false});
+				constexpr static auto value = lexy::constant(false);
 			};
 
 			constexpr static auto rule = dsl::p<literal_true> | dsl::p<literal_false>;
 			constexpr static auto value = lexy::callback<gsl::ast::expression_type>(
-					[](const value_type value) -> gsl::ast::expression_type { return gsl::ast::make<gsl::ast::ExpressionConstantBoolean>(value); }
+					[](const bool value) -> gsl::ast::expression_type { return gsl::ast::make<gsl::ast::ExpressionConstantInt>(value); }
 					);
 		};
 
@@ -445,6 +449,13 @@ namespace grammar
 			using operand = dsl::atom;
 		};
 
+		// !x
+		struct unary_logical_not : public dsl::prefix_op
+		{
+			constexpr static auto op = dsl::op<gsl::ast::ExpressionUnaryOperator::operand_type::LOGICAL_NOT>(LEXY_LIT("!"));
+			using operand = dsl::atom;
+		};
+
 		// ================================
 		// ==========binary operator============
 		// ================================
@@ -532,28 +543,8 @@ namespace grammar
 		// 		binary_bit_xor>;
 		// };
 
-		// todo: x ? y : z
-		// struct ternary_conditional : public dsl::infix_op_single
-		// {
-		// 	// We treat a conditional operator, which has three operands,
-		// 	// as a binary operator where the operator consists of ?, the inner operator, and :.
-		// 	// The <void> ensures that `dsl::op` does not produce a value.
-		// 	constexpr static auto op = dsl::op<void>(LEXY_LIT("?") >> dsl::p<nested_expression> + dsl::lit_c<':'>);
-		// 	using operand = binary_comparison;
-		// };
-
-		// x = y
-		// struct assignment : public dsl::infix_op_single
-		// {
-		// 	// Similar to * above, we need to prevent `=` from matching `==`.
-		// 	constexpr static auto op = dsl::op<void>(dsl::not_followed_by(LEXY_LIT("="), LEXY_LIT("=")));
-		// 	// using operand = ternary_conditional;
-		// 	using operand = binary_comparison;
-		// };
-
 		// An expression also needs to specify the operation with the lowest binding power.
 		// The operation of everything else is determined by following the `::operand` member.
-		// using operation = assignment;
 		// using operation = binary_comparison;
 		using operation = binary_bit_xor;
 
@@ -711,7 +702,7 @@ namespace grammar
 				LEXY_KEYWORD("struct", identifier::rule) >>
 				(dsl::p<header> +
 				 // todo: forward declaration?
-				 dsl::curly_bracketed.opt_list(dsl::p<field>));
+				 dsl::curly_bracketed.opt_list(dsl::p<field>, dsl::trailing_sep(dsl::newline | dsl::semicolon)));
 
 		constexpr static auto value = lexy::forward<void>;
 	};
@@ -903,7 +894,8 @@ namespace grammar
 				dsl::p<header> +
 				dsl::terminator(dsl::eof).opt_list(
 						dsl::p<global_declaration> |
-						dsl::p<function_declaration>
+						dsl::p<function_declaration> |
+						dsl::p<structure_declaration>
 						);
 
 		constexpr static auto value = lexy::forward<void>;
@@ -924,12 +916,19 @@ namespace gal::gsl::frontend
 
 		ParseState state{string::string{filename}, std::move(file).buffer()};
 
-		if (const auto result = lexy::parse<grammar::module_declaration>(state.buffer, state, lexy_ext::report_error.opts({.flags = lexy::visualize_fancy}).path(state.filename.c_str()));
+		if (const auto result =
+					lexy::parse<grammar::module_declaration>(state.buffer, state, lexy_ext::report_error.opts({.flags = lexy::visualize_fancy}).path(state.filename.c_str()));
 			!result.is_success())
 		{
 			// todo: handle it?
 			throw std::runtime_error{"Cannot parse file!"};
 		}
+
+		#ifdef GSL_PARSE_AS_TREE
+		lexy::parse_tree_for<decltype(state.buffer)> tree{};
+		lexy::parse_as_tree<grammar::module_declaration>(tree, state.buffer, state, lexy_ext::report_error.opts({.flags = lexy::visualize_fancy}).path(state.filename.c_str()));
+		lexy::visualize(stdout, tree, {lexy::visualize_fancy});
+		#endif
 
 		return state.mod;
 	}
