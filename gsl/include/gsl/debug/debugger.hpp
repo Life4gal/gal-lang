@@ -2,5 +2,5 @@
 
 namespace gal::gsl::debug
 {
-	auto break_here() -> void;
+	[[noreturn]] auto break_here() -> void;
 }
