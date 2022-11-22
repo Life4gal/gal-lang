@@ -75,7 +75,7 @@ namespace gal::gsl::type
 		constexpr static auto to(const Value& data) -> decltype(auto)
 		{
 			// not checked
-			return static_cast<T*>(data.raw_observer);
+			return static_cast<T*>(data.raw_pointer);
 		}
 	};
 
