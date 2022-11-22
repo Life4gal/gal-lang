@@ -344,7 +344,7 @@ namespace grammar
 
 			constexpr static auto rule = dsl::p<literal_true> | dsl::p<literal_false>;
 			constexpr static auto value = lexy::callback<gsl::ast::expression_type>(
-					[](const bool value) -> gsl::ast::expression_type { return gsl::ast::make<gsl::ast::ExpressionConstantInt>(value); }
+					[](const bool value) -> gsl::ast::expression_type { return gsl::ast::make<gsl::ast::ExpressionConstantBoolean>(value); }
 					);
 		};
 
