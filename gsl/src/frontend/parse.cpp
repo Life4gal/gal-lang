@@ -202,8 +202,13 @@ namespace grammar
 			using dimension_type = gsl::ast::TypeDeclaration::dimension_type;
 			using dimension_container_type = gsl::ast::TypeDeclaration::dimension_container_type;
 
-			constexpr static auto rule = dsl::list(dsl::lit_c<'['>//
-			                                       >> (dsl::integer<dimension_type> + dsl::lit_c<']'>));
+			constexpr static auto rule =
+					LEXY_DEBUG("parse type dimension begin") +
+					dsl::list(dsl::lit_c<'['>//
+					          >> (LEXY_DEBUG("parse a dimension number") +
+					              dsl::integer<dimension_type> + dsl::lit_c<']'>
+					          )) +
+					LEXY_DEBUG("parse type dimension end");
 
 			constexpr static auto value =
 					lexy::fold_inplace<dimension_container_type>(
@@ -212,13 +217,16 @@ namespace grammar
 		};
 
 		constexpr static auto rule =
+				LEXY_DEBUG("parse type declaration begin") +
 				dsl::position +
 				// type
+				LEXY_DEBUG("parse type name") +
 				dsl::p<identifier> +
 				// dimensions
 				dsl::opt(
 						dsl::peek(dsl::lit_c<'['>)
-						>> dsl::p<dimension_list>);
+						>> dsl::p<dimension_list>) +
+				LEXY_DEBUG("parse type declaration end");
 
 		constexpr static auto value = ParseState::callback<gsl::ast::type_declaration_type>(
 				// with dimensions
@@ -277,9 +285,12 @@ namespace grammar
 		constexpr static auto whitespace = dsl::ascii::blank;
 
 		constexpr static auto rule =
+				LEXY_DEBUG("parse variable declaration begin") +
 				dsl::position +
 				dsl::p<type_declaration> +
-				dsl::p<identifier>;
+				LEXY_DEBUG("parse variable name") +
+				dsl::p<identifier> +
+				LEXY_DEBUG("parse type declaration end");
 
 		constexpr static auto value = ParseState::callback<gsl::ast::Variable::variable_declaration>(
 				[](const ParseState& state, const ParseState::char_type* type_position, gsl::ast::type_declaration_type&& type_declaration, symbol_name&& type_name) -> gsl::ast::Variable::variable_declaration
@@ -310,7 +321,7 @@ namespace grammar
 			// as it's nested, the REPL can properly handle continuation lines.
 			constexpr static auto whitespace = dsl::ascii::space | dsl::backslash >> dsl::newline;
 
-			constexpr static auto rule = dsl::recurse<expression>;
+			constexpr static auto rule = LEXY_DEBUG("parse nested expression begin") + dsl::recurse<expression> + LEXY_DEBUG("parse nested expression end");
 
 			constexpr static auto value = lexy::forward<gsl::ast::expression_type>;
 		};
@@ -423,11 +434,12 @@ namespace grammar
 			constexpr auto literals = dsl::p<literal_bool> | dsl::p<literal_int> | dsl::p<literal_float> | dsl::p<literal_string>;
 
 			return
+					LEXY_DEBUG("parse expression begin") +
 					dsl::position +
 					(paren_expression |
 					 literals |
 					 dsl::p<noop> |
-					 dsl::error<expected_operand>);
+					 dsl::error<expected_operand>) + LEXY_DEBUG("parse expression end");
 		}();
 
 		// ================================
@@ -626,7 +638,10 @@ namespace grammar
 
 	struct variable_declaration_with_assignment
 	{
-		constexpr static auto rule = dsl::p<variable_declaration> + dsl::equal_sign + dsl::position + dsl::p<expression>;
+		constexpr static auto rule =
+				LEXY_DEBUG("parse variable with assignment begin") +
+				dsl::p<variable_declaration> + dsl::equal_sign + dsl::position + dsl::p<expression> +
+				LEXY_DEBUG("parse variable with assignment end");
 
 		constexpr static auto value = ParseState::callback<gsl::ast::variable_type>(
 				[](const ParseState& state, gsl::ast::Variable::variable_declaration&& variable_declaration, const ParseState::char_type* position, gsl::ast::expression_type&& expression) -> gsl::ast::variable_type
@@ -642,7 +657,10 @@ namespace grammar
 
 	struct variable_declaration_with_optional_assign
 	{
-		constexpr static auto rule = dsl::p<variable_declaration> + dsl::opt(dsl::equal_sign >> dsl::position + dsl::p<expression>);
+		constexpr static auto rule =
+				LEXY_DEBUG("parse variable with optional assignment begin") +
+				dsl::p<variable_declaration> + dsl::opt(dsl::equal_sign >> dsl::position + dsl::p<expression>) +
+				LEXY_DEBUG("parse variable with optional assignment end");
 
 		constexpr static auto value = ParseState::callback<gsl::ast::variable_type>(
 				// with assignment
@@ -669,7 +687,7 @@ namespace grammar
 		// struct name
 		struct header
 		{
-			constexpr static auto rule = dsl::position + dsl::p<identifier>;
+			constexpr static auto rule = LEXY_DEBUG("parse structure name") + dsl::position + dsl::p<identifier>;
 
 			constexpr static auto value = ParseState::callback<void>(
 					[](ParseState& state, const ParseState::char_type* position, symbol_name&& symbol) -> void
@@ -684,7 +702,7 @@ namespace grammar
 		struct field
 		{
 			// todo: allow assignment?
-			constexpr static auto rule = dsl::position + dsl::p<variable_declaration>;
+			constexpr static auto rule = LEXY_DEBUG("parse structure field") + dsl::position + dsl::p<variable_declaration>;
 
 			constexpr static auto value = ParseState::callback<void>(
 					[](const ParseState& state, const ParseState::char_type* position, gsl::ast::Variable::variable_declaration&& variable) -> void
@@ -699,9 +717,11 @@ namespace grammar
 
 		constexpr static auto rule =
 				LEXY_KEYWORD("struct", identifier::rule) >>
-				(dsl::p<header> +
+				(LEXY_DEBUG("parse structure declaration begin") +
+				 dsl::p<header> +
 				 // todo: forward declaration?
-				 dsl::curly_bracketed.opt_list(dsl::p<field>, dsl::trailing_sep(dsl::newline | dsl::semicolon)));
+				 dsl::curly_bracketed.opt_list(dsl::p<field>, dsl::trailing_sep(dsl::newline | dsl::semicolon)) +
+				 LEXY_DEBUG("parse structure declaration end"));
 
 		constexpr static auto value = lexy::forward<void>;
 	};
@@ -763,9 +783,12 @@ namespace grammar
 
 		constexpr static auto rule =
 				LEXY_KEYWORD("global", identifier::rule) >>
-				((dsl::p<mutable_global> | dsl::p<immutable_global>) +
-				 // semicolon required ?
-				 dsl::semicolon);
+				(
+					LEXY_DEBUG("parse global declaration begin") +
+					(dsl::p<mutable_global> | dsl::p<immutable_global>) +
+					// semicolon required ?
+					dsl::semicolon +
+					LEXY_DEBUG("parse global declaration end"));
 
 		constexpr static auto value = lexy::forward<void>;
 	};
@@ -808,12 +831,15 @@ namespace grammar
 			constexpr static auto rule =
 					// function name
 					dsl::position +
+					LEXY_DEBUG("parse function name") +
 					dsl::p<identifier> +
 					// arguments
+					LEXY_DEBUG("parse function arguments") +
 					dsl::p<arguments_list> +
 					// return type
 					// todo: optional return type?
 					LEXY_LIT("->").error<return_type_expected> +
+					LEXY_DEBUG("parse function return type") +
 					dsl::p<type_declaration>;
 
 			constexpr static auto value = ParseState::callback<void>(
@@ -841,7 +867,11 @@ namespace grammar
 
 		struct body
 		{
-			constexpr static auto rule = dsl::curly_bracketed.open() >> (dsl::position + dsl::p<expression> + dsl::curly_bracketed.close());
+			constexpr static auto rule = dsl::curly_bracketed.open() >> (
+				                             LEXY_DEBUG("parse function body begin") +
+				                             dsl::position + dsl::p<expression> + dsl::curly_bracketed.close() +
+				                             LEXY_DEBUG("parse function body end")
+			                             );
 
 			constexpr static auto value = ParseState::callback<void>(
 					[](const ParseState& state, const ParseState::char_type* position, gsl::ast::expression_type&& body) -> void
@@ -856,9 +886,12 @@ namespace grammar
 		constexpr static auto rule =
 				LEXY_KEYWORD("fn", identifier::rule) >>
 				// function declaration
-				(dsl::p<header> +
-				 // function body
-				 dsl::p<body>);
+				(
+					LEXY_DEBUG("parse function declaration begin") +
+					dsl::p<header> +
+					// function body
+					dsl::p<body> +
+					LEXY_DEBUG("parse function declaration end"));
 
 		constexpr static auto value = lexy::forward<void>;
 	};
@@ -881,6 +914,7 @@ namespace grammar
 			constexpr static auto rule =
 					LEXY_KEYWORD("module", identifier::rule) +
 					// todo: check module duplicate?
+					LEXY_DEBUG("parse module name") +
 					dsl::p<identifier> +
 					// semicolon required ?
 					dsl::semicolon;
