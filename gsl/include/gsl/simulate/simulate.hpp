@@ -18,7 +18,7 @@ namespace gal::gsl::simulate
 	class SimulateNode
 	{
 	public:
-		using value_type = type::Value;
+		using value_type = type::BoxedValue;
 
 	protected:
 	public:
@@ -38,7 +38,7 @@ namespace gal::gsl::simulate
 	public:
 		using name_type = string::string::pointer;
 		using size_type = string::string::size_type;
-		using value_type = type::Value;
+		using value_type = SimulateNode::value_type;
 
 	private:
 		name_type name_;
@@ -127,13 +127,13 @@ namespace gal::gsl::simulate
 
 		[[nodiscard]] constexpr auto get_function_argument(const function_index_type index) const -> SimulateNode::value_type { return function_arguments_[index]; }
 
-		[[nodiscard]] constexpr auto get_stack_value(const stack_type::size_type index) const noexcept -> SimulateNode::value_type { return SimulateNode::value_type{.raw_pointer = stack_.data() + current_stack_used_ + index}; }
+		[[nodiscard]] constexpr auto get_stack_value(const stack_type::size_type index) const noexcept -> SimulateNode::value_type { return type::BoxedCaster::from(stack_.data() + current_stack_used_ + index); }
 	};
 
 	class SimulateFieldNode final : public SimulateNode
 	{
 	public:
-		using offset_type = std::uint32_t;
+		using offset_type = std::ptrdiff_t;
 
 	private:
 		SimulateNode* object_;
@@ -146,8 +146,9 @@ namespace gal::gsl::simulate
 
 		[[nodiscard]] auto eval(SimulateContext& context) -> value_type override
 		{
-			const auto ret = object_->eval(context);
-			return value_type{.raw_pointer = static_cast<SimulateContext::data_type>(ret.raw_pointer) + offset_};
+			auto obj = object_->eval(context);
+			const auto address = type::BoxedCaster::to<char*>(obj);
+			return type::BoxedCaster::from(address + offset_);
 		}
 	};
 
@@ -320,10 +321,10 @@ namespace gal::gsl::simulate
 
 	public:
 		explicit SimulateConstantNode(value_type&& value)
-			: value_{type::ValueCaster<value_type>::from(std::move(value))} {}
+			: value_{type::BoxedCaster::from(std::move(value))} {}
 
 		explicit SimulateConstantNode(const value_type& value)
-			: value_{type::ValueCaster<value_type>::from(value)} {}
+			: value_{type::BoxedCaster::from(value)} {}
 
 		auto eval(SimulateContext& context) -> SimulateNode::value_type override
 		{
@@ -354,12 +355,12 @@ namespace gal::gsl::simulate
 
 		auto eval(SimulateContext& context) -> value_type override
 		{
-			const auto l = lhs_->eval(context);
-			const auto r = rhs_->eval(context);
+			auto lhs = lhs_->eval(context);
+			const auto rhs = rhs_->eval(context);
 
 			// todo: plain copy?
-			std::memcpy(l.raw_pointer, r.raw_observer, size_);
-			return l;
+			type::BoxedCaster::copy(lhs, rhs, size_);
+			return lhs;
 		}
 	};
 
@@ -382,13 +383,11 @@ namespace gal::gsl::simulate
 
 		auto eval(SimulateContext& context) -> SimulateNode::value_type override
 		{
-			const auto l = lhs_->eval(context);
-			const auto r = rhs_->eval(context);
+			auto lhs = lhs_->eval(context);
+			const auto rhs = rhs_->eval(context);
 
-			auto* pl = type::ValueCaster<value_type*>::to(l);
-			auto* pr = type::ValueCaster<value_type*>::to(r);
-			*pl = *pr;
-			return l;
+			type::BoxedCaster::copy<value_type>(lhs, rhs);
+			return lhs;
 		}
 	};
 }
