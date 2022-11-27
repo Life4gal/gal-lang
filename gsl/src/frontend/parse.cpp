@@ -3,17 +3,16 @@
 
 #include <lexy/dsl.hpp>
 #include <lexy/action/parse.hpp>
+#include <lexy/action/trace.hpp>
 #include <lexy/input/file.hpp>
 #include <lexy/input/string_input.hpp>
 #include <lexy_ext/report_error.hpp>
 #include <lexy/callback.hpp>
 #include <lexy/visualize.hpp>
 
-#define GSL_PARSE_AS_TREE
-
-#ifdef GSL_PARSE_AS_TREE
-#include <lexy/action/parse_as_tree.hpp>
-#endif
+#define GSL_PARSE_ERROR_OUTPUT stderr
+#define GSL_TRACE_PARSE
+#define GSL_TRACE_PARSE_OUTPUT stdout
 
 #include <optional>
 #include <cstdio>
@@ -61,14 +60,14 @@ namespace
 		{
 			const auto location = lexy::get_input_location(buffer, position, buffer_anchor);
 
-			const auto out = lexy::cfile_output_iterator{stderr};
+			const auto out = lexy::cfile_output_iterator{GSL_PARSE_ERROR_OUTPUT};
 			const lexy_ext::diagnostic_writer writer{buffer, {.flags = lexy::visualize_fancy}};
 
 			(void)writer.write_message(out,
 			                           lexy_ext::diagnostic_kind::error,
 			                           [&](lexy::cfile_output_iterator, lexy::visualization_options)
 			                           {
-				                           (void)std::fprintf(stderr, "unknown %s name '%s'", category, identifier.data());
+				                           (void)std::fprintf(GSL_PARSE_ERROR_OUTPUT, "unknown %s name '%s'", category, identifier.data());
 				                           return out;
 			                           });
 
@@ -82,7 +81,7 @@ namespace
 					identifier.size(),
 					[&](lexy::cfile_output_iterator, lexy::visualization_options)
 					{
-						(void)std::fprintf(stderr, "used here");
+						(void)std::fprintf(GSL_PARSE_ERROR_OUTPUT, "used here");
 						return out;
 					});
 		}
@@ -91,14 +90,14 @@ namespace
 		{
 			const auto location = lexy::get_input_location(buffer, position, buffer_anchor);
 
-			const auto out = lexy::cfile_output_iterator{stderr};
+			const auto out = lexy::cfile_output_iterator{GSL_PARSE_ERROR_OUTPUT};
 			const lexy_ext::diagnostic_writer writer{buffer, {.flags = lexy::visualize_fancy}};
 
 			(void)writer.write_message(out,
 			                           lexy_ext::diagnostic_kind::error,
 			                           [&](lexy::cfile_output_iterator, lexy::visualization_options)
 			                           {
-				                           (void)std::fprintf(stderr, "invalid %s expression passed", category);
+				                           (void)std::fprintf(GSL_PARSE_ERROR_OUTPUT, "invalid %s expression passed", category);
 				                           return out;
 			                           });
 
@@ -112,7 +111,7 @@ namespace
 					identifier.size(),
 					[&](lexy::cfile_output_iterator, lexy::visualization_options)
 					{
-						(void)std::fprintf(stderr, "for '%s'", identifier.data());
+						(void)std::fprintf(GSL_PARSE_ERROR_OUTPUT, "for '%s'", identifier.data());
 						return out;
 					});
 		}
@@ -121,14 +120,14 @@ namespace
 		{
 			const auto location = lexy::get_input_location(buffer, position, buffer_anchor);
 
-			const auto out = lexy::cfile_output_iterator{stderr};
+			const auto out = lexy::cfile_output_iterator{GSL_PARSE_ERROR_OUTPUT};
 			const lexy_ext::diagnostic_writer writer{buffer, {.flags = lexy::visualize_fancy}};
 
 			(void)writer.write_message(out,
 			                           lexy_ext::diagnostic_kind::error,
 			                           [&](lexy::cfile_output_iterator, lexy::visualization_options)
 			                           {
-				                           (void)std::fprintf(stderr, "duplicate %s declaration named '%s'", category, identifier.data());
+				                           (void)std::fprintf(GSL_PARSE_ERROR_OUTPUT, "duplicate %s declaration named '%s'", category, identifier.data());
 				                           return out;
 			                           });
 
@@ -142,7 +141,7 @@ namespace
 					identifier.size(),
 					[&](lexy::cfile_output_iterator, lexy::visualization_options)
 					{
-						(void)std::fprintf(stderr, "second declaration here");
+						(void)std::fprintf(GSL_PARSE_ERROR_OUTPUT, "second declaration here");
 						return out;
 					});
 		}
@@ -151,14 +150,14 @@ namespace
 		{
 			const auto location = lexy::get_input_location(buffer, position, buffer_anchor);
 
-			const auto out = lexy::cfile_output_iterator{stderr};
+			const auto out = lexy::cfile_output_iterator{GSL_PARSE_ERROR_OUTPUT};
 			const lexy_ext::diagnostic_writer writer{buffer, {.flags = lexy::visualize_fancy}};
 
 			(void)writer.write_message(out,
 			                           lexy_ext::diagnostic_kind::warning,
 			                           [&](lexy::cfile_output_iterator, lexy::visualization_options)
 			                           {
-				                           (void)std::fprintf(stderr, "shadow %s declaration named '%s'", category, identifier.data());
+				                           (void)std::fprintf(GSL_PARSE_ERROR_OUTPUT, "shadow %s declaration named '%s'", category, identifier.data());
 				                           return out;
 			                           });
 
@@ -172,7 +171,7 @@ namespace
 					identifier.size(),
 					[&](lexy::cfile_output_iterator, lexy::visualization_options)
 					{
-						(void)std::fprintf(stderr, "second declaration here");
+						(void)std::fprintf(GSL_PARSE_ERROR_OUTPUT, "second declaration here");
 						return out;
 					});
 		}
@@ -891,12 +890,14 @@ namespace grammar
 		};
 
 		constexpr static auto rule =
+				LEXY_DEBUG("module declaration begin") +
 				dsl::p<header> +
 				dsl::terminator(dsl::eof).opt_list(
 						dsl::p<global_declaration> |
 						dsl::p<function_declaration> |
 						dsl::p<structure_declaration>
-						);
+						) +
+				LEXY_DEBUG("module declaration end");
 
 		constexpr static auto value = lexy::forward<void>;
 	};
@@ -924,10 +925,11 @@ namespace gal::gsl::frontend
 			throw std::runtime_error{"Cannot parse file!"};
 		}
 
-		#ifdef GSL_PARSE_AS_TREE
-		lexy::parse_tree_for<decltype(state.buffer)> tree{};
-		lexy::parse_as_tree<grammar::module_declaration>(tree, state.buffer, state, lexy_ext::report_error.opts({.flags = lexy::visualize_fancy}).path(state.filename.c_str()));
-		lexy::visualize(stdout, tree, {lexy::visualize_fancy});
+		#ifdef GSL_TRACE_PARSE
+		lexy::trace<grammar::module_declaration>(
+				GSL_TRACE_PARSE_OUTPUT,
+				state.buffer,
+				{.flags = lexy::visualize_fancy});
 		#endif
 
 		return state.mod;
